@@ -39,6 +39,18 @@ def piirra_start(win, img_start):
     win.blit(img_start, (sx, sy))
 
 
+def pistejarjestelma():
+    pass
+
+
+def ammukset():
+    pass
+
+def gameOver():
+    pass
+
+
+
 def main():
     pygame.init()
     win = pygame.display.set_mode((WIDTH, HEIGHT))
