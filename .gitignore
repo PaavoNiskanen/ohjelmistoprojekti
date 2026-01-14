@@ -1,0 +1,11 @@
+# Ignore external Unity/Tite24 exported assets and per-project sprite folders
+# Matches folder named `Alukset_Spritet` anywhere in the repo/workspace
+Alukset_Spritet/
+
+# If you keep the full Tite24 project under the repo root, ignore it too
+Tite24_2Dpeli/
+
+# Common Python artifacts
+__pycache__/
+*.py[cod]
+.venv/
