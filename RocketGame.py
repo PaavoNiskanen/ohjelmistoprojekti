@@ -234,10 +234,10 @@ def main():
         move_frames = load_frames_from_dir(move_dir, (SHIP_W, SHIP_H))
         # Ladataan aluksen attack-kehykset (Attack_1) ja projektio-kehykset (Charge_1)
         ship_attack_dir = os.path.join(base, 'Attack_1')
-        ship_attack_frames = load_frames_from_dir(ship_attack_dir, (SHIP_W, SHIP_H), rotate_deg=0)
+        ship_attack_frames = load_frames_from_dir(ship_attack_dir, (SHIP_W, SHIP_H), rotate_deg=90)
         # projektileissa käytetään Charge_1
         charge_dir = os.path.join(base, 'Charge_1')
-        projectile_frames = load_frames_from_dir(charge_dir, (24, 24), rotate_deg=0)
+        projectile_frames = load_frames_from_dir(charge_dir, (24, 24), rotate_deg=90)
         # varakansio: yritä käyttäjän Pictures-kansiota, jos projektileja ei löydy
         if not projectile_frames:
             alt = os.path.join(os.path.expanduser('~'), 'Pictures', 'SpriteSlicer', 'valmiitSpritet_extracted', 'spaceship-sprite-sheets', 'Bomber', 'Charge_2')
