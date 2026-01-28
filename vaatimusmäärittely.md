@@ -1,131 +1,146 @@
-# Vaatimusmäärittely — RocketGame
+Vaatimusmäärittely 	
+Päiväys: 14.1.2026
 
-Päiväys: 2026-01-14
+Yleiskuvaus:
+Kevyt 2D-avaruuspeliprojekti (Python + Pygame), jossa pelaaja ohjaa alusta, taistelee vihollisia vastaan ja kerää pisteitä/voittoehdot. Vaatimusmäärittelyssä määritellään projektin toiminnalliset ja ei-toiminnalliset vaatimukset.
 
-**Yleiskuvaus:**
-Kevyt 2D-avaruuspeliprojekti (Python + Pygame) jossa pelaaja ohjastaa alusta, taistelee vihollisia vastaan ja kerää pisteitä/voittoehdot. Tämä vaatimusmäärittely määrittelee projektin toiminnalliset ja ei-toiminnalliset vaatimukset.
+Sidosryhmät:
+- pelaajat
+- kehittäjät
+- opettaja.
 
-**Sidosryhmät:**
-- Pelaajat
-- Kehittäjät
-- Opettaja / arvioija
+Laajuus:
+Sisältää yksinpelin tilan, mahdollisesti useamman eri tason, pelaajan ohjauksen, viholliset, törmäykset, pisteytyksen, äänen perustoiminnot ja pisteiden tallennuksen. Ei sisällä moninpelitoimintoja tai verkkoyhteyksiä tässä versiossa.
 
-**Laajuus:**
-Sisältää yksinpelin tilan (yksi taso tai rajoitettu pelikierros), pelaajan ohjauksen, viholliset, törmäykset, pisteytyksen, äänen perustoiminnot ja tallennuksen (pisteet). Ei sisällä moninpelitoimintoja tai verkkoyhteyksiä tässä versiossa.
+Toiminnalliset vaatimukset:
+1. Pelin käynnistys ja valikko
+- Kuvaus: sovellus käynnistyy päävalikkoon, josta voi aloittaa pelin, katsoa ohjeet tai lopettaa pelin.
+- Tärkeysjärjestys: korkea
+- Hyväksymisehto: päävalikko näkyy ja valikot toimivat näppäin-/hiiriohjaimella.
 
-## Toiminnalliset vaatimukset (Functional Requirements)
+2. Pelaajan ohjaus
+- Kuvaus: pelaaja voi liikkua (vasen/oikea/ylös/alas tai vaihtoehtoiset näppäimet), ampua (mahdolliset erikoistoiminnot?)
+- Tärkeysjärjestys: korkea
+- Hyväksymisehto: ohjaukset reagoivat viiveettä ja animoinnit päivittyvät.
 
-F1 — Pelin käynnistys ja valikko
-- Kuvaus: Sovellus käynnistyy päävalikkoon, josta voi aloittaa pelin, katsoa ohjeet, tai lopettaa pelin.
-- Prioriteetti: Korkea
-- Hyväksymiskriteeri: Päävalikko näkyy ja valikot toimivat näppäin-/hiiriohjaimella.
-
-F2 — Pelaajan ohjaus
-- Kuvaus: Pelaaja voi liikkua (vasen/oikea/ylös/alas tai vaihtoehtoiset näppäimet), ampua ja käyttää mahdollisia erikoistoimintoja (boost).
-- Prioriteetti: Korkea
-- Hyväksymiskriteeri: Ohjaukset reagoivat viiveettä ja animoinnit päivittyvät.
-
-F3 — Viholliset ja tekoäly
+3. Viholliset 
 - Kuvaus: Pelissä esiintyy erilaisia vihollisia, joilla on yksinkertainen käyttäytyminen (suora lento, kiertoliike, hyökkäys pelaajaa kohti).
-- Prioriteetti: Keskitaso
-- Hyväksymiskriteeri: Vähintään kaksi vihollistyyppiä näkyvissä ja toimivina.
+- Tärkeysjärjestys: keskitaso
+- Hyväksymisehto: vähintään kaksi vihollistyyppiä näkyvissä ja toimivina.
 
-F4 — Törmäykset ja vahingot
-- Kuvaus: Osumat ammuista tai vihollisista aiheuttavat vahinkoa; pelaajalla on elämät/energia.
-- Prioriteetti: Korkea
-- Hyväksymiskriteeri: Vahinko ja elämien vähentyminen tapahtuvat oikein, kuolema johtaa peli- tai uudelleenaloitusnäkymään.
+4. Törmäykset ja vahingot
+- Kuvaus: ammuksiin tai vihollisiin osuminen aiheuttaa vahinkoa. Pelaajalla on elämät tai energia (kolme sydäntä, jotka sijaitsevat pelin oikeassa ylälaidassa).
+- Tärkeysjärjestys: korkea
+- Hyväksymisehto: vahinko ja elämien vähentyminen toimivat oikein, ja kuolema johtaa peli- tai uudelleenaloitusnäkymään.
 
-F5 — Pisteytys ja tulosnäyttö
-- Kuvaus: Pelaaja saa pisteitä vihollisen tuhoamisesta ja kerättävistä esineistä; pelin lopussa näytetään tulos.
-- Prioriteetti: Korkea
-- Hyväksymiskriteeri: Pisteet kasvavat oikeista toiminnoista ja tallennetaan väliaikaisesti pelisession ajaksi.
+5. Pisteytys ja tulosnäyttö
+- Kuvaus: pelaaja saa pisteitä vihollisen tuhoamisesta, ja pelin lopussa näytetään tulos.
+- Tärkeysjärjestys: korkea
+- Hyväksymisehto: pisteet kasvavat oikeista toiminnoista, ja ne tallennetaan väliaikaisesti pelisession ajaksi.
 
-F6 — Äänet ja musiikki
-- Kuvaus: Taustamusiikki ja ääniefektit (ammus, räjähdys, valikoissa navigointi).
-- Prioriteetti: Matala–keskitaso
-- Hyväksymiskriteeri: Äänet toistuvat ja voivat olla pois päältä asetuksista.
+6. Äänet ja musiikki
+- Kuvaus: taustamusiikki ja äänitehosteet (ammus, räjähdys, valikoissa navigointi).
+- Tärkeysjärjestys: matala–keskitaso
+- Hyväksymisehto: äänet toistuvat, ja ne voidaan poistaa käytöstä asetuksista.
 
-F7 — Tallennus ja asetukset
-- Kuvaus: Pelin perusasetukset (äänenvoimakkuus, avaimet) tallentuvat paikalliseen asetustiedostoon; korkein piste saavutetaan näkyviin.
-- Prioriteetti: Keskitaso
-- Hyväksymiskriteeri: Asetusten muutos pysyy sovelluksen uudelleenkäynnistyksen yli.
+7. Tallennus ja asetukset
+- Kuvaus: pelin perusasetukset (äänenvoimakkuus, avaimet) tallentuvat paikalliseen asetustiedostoon; korkein piste saavutetaan näkyviin.
+- Tärkeysjärjestys: keskitaso
+- Hyväksymisehto: asetusten muutos pysyy sovelluksen uudelleenkäynnistyksen yli.
 
-F8 — Ohjeet ja käyttötapa
-- Kuvaus: Pelin sisäiset ohjeet, jotka selittävät ohjauksen ja pelitavoitteen.
-- Prioriteetti: Matala
-- Hyväksymiskriteeri: Ohjeet saavutettavissa päävalikosta.
+8. Ohjeet ja käyttötapa
+- Kuvaus: pelin sisäiset ohjeet, jotka selittävät ohjauksen ja pelitavoitteen.
+- Tärkeysjärjestys: matala
+- Hyväksymisehto: ohjeet saavutetaan päävalikosta.
+Pelisisältövaatimukset: tasot (1–5)
+Tasojen yhteiset säännöt:
+-	Pelaajalla on kolme elämää. Elämät vähenevät törmätessä viholliseen tai vihollisen ammuksiin (tasojen mukaan).
+-	Perusvihollinen (tyyppi A) tuhoutuu yhdestä osumasta.
+-	Jokaisessa tasossa on pistetavoite ja lopussa päävihollinen (päävihollinen ilmestyy, kun pistetavoite saavutetaan).
+1. taso
+-	Vihollisia yhteensä 20 (tyyppi A).
+-	Viholliset ilmestyvät satunnaisesti yhdestä suunnasta kolmen ryhmissä.
+-	Viholliset liikkuvat pelialueella edestakaisin eivätkä ammu.
+-	Hyväksymisehto: 20 vihollista pitää tuhota, ennen kuin päävihollinen ilmestyy.
+2. taso
+-	Sama kuin taso 1, mutta vihollisten nopeus kasvaa (esim. +20–40 %).
+-	Hyväksymisehto: vaikeus kasvaa mitattavasti (nopeusparametri muuttuu).
+3. taso
+- Mukana uusi B-tyypin vihollinen, joka vaatii kolme osumaa.
+- Ilmestyy sekä A- että B-tyypin vihollisia.
+- Hyväksymisehto: B-tyyppi ei tuhoudu ennen kolmatta osumaa, ja molempien vihollisten pisteytys toimii.
+4. taso
+- Vähintään yhden tyypin viholliset ampuvat takaisin.
+- Uusi vihollistyyppi C (esim. viisi osumaa).
+- Hyväksymisehto: vihollisammukset aiheuttavat vahinkoa, ja C-tyypillä on selvä kestävyys- tai mekaniikkaero.
+5. taso
+- Peli vaikeutuu. Tulee enemmän vihollisia, nopeammat ammukset tms.
+- Pelaajalle uusi ase, kyky tai mekaniikka.
+- Hyväksymisehto: uusi mekaniikka on käytettävissä ja ohjeistettu, ja se vaikuttaa pelitilanteisiin.
 
-F9 — Hahmon valitseminen 
-- Kuvaus: Pelaaja voi valita haluamansa hahmon (aluksen). Kaikki hahmot näyttävät erilaiselta (joko eri värisiä tai kokonaan erilainen alus). Hahmo ampuu myös eri tavalla. 
+9. Hahmon valitseminen
+- Kuvaus: Pelaaja voi valita haluamansa hahmon (aluksen). Kaikki hahmot näyttävät erilaiselta (joko erivärisiä tai kokonaan erilainen alus). Hahmo ampuu myös eri tavalla.
 - Prioriteetti: Matala
 - Hyväksymiskriteeri: Pelaaja voi valita eri hahmon, joka muuttaa ulkonäköä.
 
-F10 — Pelin vaikeustaso
-- Kuvaus: Pelissä on vähintään kaksi vaikeustasoa (esim. helppo / normaali), jotka vaikuttavat vihollisten määrään tai nopeuteen.
-- Prioriteetti: Keskitaso
-- Hyväksymiskriteeri: Pelaaja voi valita vaikeustason ennen pelin alkua, ja ero on havaittavissa pelissä.
-
-F11 — Tauko-toiminto (?)
+10. Taukotoiminto (?)
 - Kuvaus: Pelaaja voi keskeyttää pelin (pause) ja jatkaa myöhemmin.
 - Prioriteetti: Keskitaso/matala
 - Hyväksymiskriteeri: Peli pysähtyy tauon aikana eikä pelitila muutu.
 
-F12 — Visuaalinen palaute
+11. Visuaalinen palaute
 - Kuvaus: Osumista ja tapahtumista annetaan visuaalista palautetta (välähdys, räjähdysanimaatio, ruudun tärähdys).
 - Prioriteetti: Matala
 - Hyväksymiskriteeri: Osuma tai vihollisen tuhoutuminen näkyy selkeästi pelaajalle.
 
-F13 — Kerättävät esineet (power-upit)
+12. Kerättävät esineet (power-upit) (?)
 - Kuvaus: Pelissä voi esiintyä kerättäviä esineitä, jotka antavat väliaikaisia etuja (nopeampi ammus, lisäelämä).
 - Prioriteetti: Matala
 - Hyväksymiskriteeri: Power-up vaikuttaa pelaajan toimintaan määräajan tai pysyvästi.
 
-## Ei-toiminnalliset vaatimukset (Non-Functional Requirements)
 
-NFR1 — Suorituskyky
+Ei-toiminnalliset vaatimukset 
+1. Suorituskyky
 - Kuvaus: Peli tavoittaa vakaan ruudunpäivitysnopeuden (target 60 FPS) tyypillisellä kehityskoneella.
 - Mittari: FPS ei putoa alle 30 normaalissa pelitilanteessa.
 
-NFR2 — Yhteensopivuus
-- Kuvaus: Peli toimii Windows 10/11 -ympäristössä Python 3.10+ ja Pygame-kirjaston avulla.
+2. Yhteensopivuus
+- Kuvaus: Peli toimii Windows 10/11-ympäristössä, Python 3.10+ ja Pygame-kirjaston avulla.
 - Mittari: Asennusohjeilla pelin voi käynnistää vakiokokoonpanolla.
 
-NFR3 — Luotettavuus ja vakaus
-- Kuvaus: Peli ei kaadu tavallisten pelitapahtumien seurauksena; kriittiset virheet käsitellään siististi.
-- Mittari: Ei kriittisiä poikkeuksia normaaleilla pelin sisäisillä toiminnoilla.
+3. Luotettavuus ja vakaus
+- Kuvaus: peli ei kaadu tavallisista pelitapahtumista, ja kriittiset virheet käsitellään siististi.
+- Mittari: normaaleilla pelin sisäisillä toiminnoilla ei tule kriittisiä poikkeuksia.
 
-NFR4 — Käytettävyys
-- Kuvaus: Peli tarjoaa selkeän käyttöliittymän ja käyttöohjeet; ohjaukset ovat intuitiiviset.
-- Mittari: Ensimmäisen pelikerran jälkeen pelaaja ymmärtää pelin perusmekaniikan ilman ohjausta.
+4. Käytettävyys
+- Kuvaus: peli tarjoaa selkeän käyttöliittymän ja käyttöohjeet, ja ohjaukset ovat intuitiiviset.
+- Mittari: ensimmäisen pelikerran jälkeen pelaaja ymmärtää pelin perusmekaniikan ilman ohjausta.
 
-NFR5 — Huollettavuus
-- Kuvaus: Lähdekoodi on kommentoitu ja modulaarinen; jokainen pääkomponentti (pelaaja, vihollinen, peli-logiikka, UI) on omassa moduulissaan.
-- Mittari: Uuden vihollistyypin lisääminen vaatii enintään yhden uuden moduulin ja muutoksia alle kahteen olemassa olevaan tiedostoon.
+5. Huollettavuus
+- Kuvaus: lähdekoodi on kommentoitu ja modulaarinen; jokainen pääkomponentti (pelaaja, vihollinen, pelilogiikka, UI) on omassa moduulissaan.
+- Mittari: uuden vihollistyypin lisääminen vaatii enintään yhden uuden moduulin, ja muutoksia pitää tehdä alle kahteen olemassa olevaan tiedostoon.
 
-NFR6 — Lokalisaatio
-- Kuvaus: Pääasiallinen kieli on suomi, mutta tekstit tullaan pitämään erillisessä resurssitiedostossa, mikä mahdollistaa laajennuksen muihin kieliin.
+6. Lokalisaatio
+- Kuvaus: pääasiallinen kieli on suomi, mutta tekstit pidetään erillisessä resurssitiedostossa, mikä mahdollistaa muihin kieliin laajentamisen.
 - Mahdollinen tavoite: Olisi vaihtoehtona valita englannin kieli. 
 
-NFR7 — Turvallisuus
-- Kuvaus: Sovellus ei kerää henkilökohtaisia tietoja eikä lähetä dataa verkkoon.
+7. Turvallisuus
+- Kuvaus: sovellus ei kerää henkilökohtaisia tietoja eikä lähetä dataa verkkoon.
 
-NFR8 — Resurssien käyttö
-- Kuvaus: Peli ei ylitä kohtuullista muistinkulutusta (esim. < 500 MB) normaaleissa tilanteissa ja vapauttaa resurssit suljettaessa.
+8. Resurssien käyttö
+- Kuvaus: normaaleissa tilanteissa peli ei ylitä kohtuullista muistinkulutusta (esim. < 500 MB) ja suljettaessa vapauttaa resurssit.
 
-## Hyväksymiskriteerit ja testaus
-- Yksikkötestit tärkeimmälle pelilogiikalle (pisteytys, törmäystarkistus) missä mahdollista.
-- Manuaaliset testit: käynnistys, valikkonavigointi, pelaajan liike, ampuminen, törmäykset, vihollisten ilmestyminen, äänen päälle/pois.
+Hyväksymiskriteerit ja testaus
+- Yksikkötestit tärkeimmälle pelilogiikalle (pisteytys, törmäystarkistus), missä mahdollista.
+- Manuaaliset testit: käynnistys, valikkonavigointi, pelaajan liike, ampuminen, törmäykset, vihollisten ilmestyminen, ääni käyttöön ja pois käytöstä.
 - Suorituskykytesti: peli pyörii 60 FPS tavoitellulla koneella.
 
-## Rajoitukset ja oletukset
+ Rajoitukset ja oletukset
 - Oletusympäristö: Windows + Python 3.10+ + Pygame.
 - Verkko-ominaisuuksia tai moninpeliä ei toteuteta tässä projektissa.
 
-## Avoimet kohdat / Mahdolliset laajennukset
-- Lisää tasoja ja vaikeustasoja
-- Peli-asetusten laajentaminen (kontrollerituki, grafiikka-asetukset)
-- Tallennus pilveen ja leaderboards
-
----
-
-Jos haluat, voin jatkossa jakaa tämän vaatimusmäärittelyn pienempiin tehtäviin ja lisätä yksityiskohtaiset käyttöliittymämockupit tai testitapaukset.
+Mahdolliset laajennukset
+- Lisää tasoja ja vaikeustasoja.
+- Peliasetusten laajentaminen (kontrollerituki, grafiikka-asetukset).
+- Pilvitallennus ja pistetaulukko.
+- Kamera seuraa pelaajaa, ja alusta pystyy liikuttamaan 360 astetta.
