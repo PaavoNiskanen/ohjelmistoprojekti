@@ -4,7 +4,7 @@ import pygame
 import os
 import random
 from player import Player
-
+from points import Points
 
 
 currentWorkDir = os.getcwd()
@@ -72,7 +72,8 @@ if os.path.isdir(boost_dir):
         if f.lower().endswith('.png'):
             boost_frames.append(pygame.image.load(os.path.join(boost_dir, f)).convert_alpha())
 
-
+# Luodaan pistelaskuriolio.
+pistejarjestelma = Points()
 
 # Luo pelaaja maailman keskelle
 player_start_x = tausta_leveys // 2
@@ -118,6 +119,9 @@ while run:
 
     # Piirrä pelaaja kameran suhteessa
     player.draw(screen, camera_x, camera_y)
+
+    # Näytä pisteet vasemmassa yläkulmassa.
+    pistejarjestelma.show_score(10, 10, pygame.font.SysFont('Arial', 24), screen)
 
     # Päivitä näyttö
     pygame.display.update()
