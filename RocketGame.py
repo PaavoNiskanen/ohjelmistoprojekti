@@ -1,10 +1,12 @@
-# Pohjat otettu: https://www.youtube.com/watch?v=2iyx8_elcYg
-# Avaruus-spriteja löytyy: https://www.freepik.com/free-photos-vectors/space-sprite#uuid=689f2d8e-f000-4f6c-be3f-d277040f2102
-import pygame
+import sys
 import os
+import pygame
 import random
 from player import Player
 from enemy import StraightEnemy, CircleEnemy
+from points import Points
+sys.path.append(os.path.dirname(__file__))
+from PLAYER_LUOKAT.Player import Player
 
 
 currentWorkDir = os.getcwd()
@@ -97,7 +99,8 @@ if os.path.isdir(boost_dir):
         if f.lower().endswith('.png'):
             boost_frames.append(pygame.image.load(os.path.join(boost_dir, f)).convert_alpha())
 
-
+# Luodaan pistelaskuriolio.
+pistejarjestelma = Points()
 
 # Luo pelaaja maailman keskelle
 player_start_x = tausta_leveys // 2
@@ -130,6 +133,7 @@ while run:
     # Keskitetään kamera pelaajaan (kameran sijainti maailmassa)
     camera_x = player.rect.centerx - X // 2
     camera_y = player.rect.centery - Y // 2
+    
     # Rajoita kamera taustan reunoihin
     camera_x = max(0, min(camera_x, tausta_leveys - X))
     camera_y = max(0, min(camera_y, tausta_korkeus - Y))
@@ -151,6 +155,9 @@ while run:
 
     # Piirrä pelaaja kameran suhteessa
     player.draw(screen, camera_x, camera_y)
+
+    # Näytä pisteet vasemmassa yläkulmassa.
+    pistejarjestelma.show_score(10, 10, pygame.font.SysFont('Arial', 24), screen)
 
     # Päivitä näyttö
     pygame.display.update()
