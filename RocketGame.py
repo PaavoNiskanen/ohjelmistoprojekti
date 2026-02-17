@@ -1,14 +1,23 @@
+"""
+Module: RocketGame.py
+Dependencies: pygame, os, random, SpriteSettings, PLAYER_LUOKAT.Player (Player), EnemyAI (StraightEnemy, CircleEnemy), boss_enemy (BossEnemy), Points
+Provides: main game loop, loads sprites and spawns enemies/boss, handles collisions and draws
+Uses: EnemyHelpers for specific explosion spawn when needed
+"""
+
 import sys
 import os
 import pygame
 import random
+import math
 #from player import Player
-from enemy import StraightEnemy, CircleEnemy
+from EnemyAI import StraightEnemy, CircleEnemy
 from boss_enemy import BossEnemy
 from points import Points
 sys.path.append(os.path.dirname(__file__))
-from PLAYER_LUOKAT.Player import Player
+from Player import Player
 from MainMenu import MainMenu
+from SpriteSettings import SpriteSettings
 
 
 # Näytä päävalikko ensin
@@ -76,13 +85,37 @@ boss_image = pygame.transform.scale(
     (320, 320)  # iso boss
 )
 
+# Load Ship sprites (Ship2 by default) and exhaust/shot frames
+ss = SpriteSettings(base_path=os.path.join(os.path.dirname(__file__), 'enemy-sprite'), ship='Ship2')
+ss.load_all()
+
+
 
 world_rect = pygame.Rect(0, 0, tausta_leveys, tausta_korkeus)
 
 enemies = []
-enemies.append(StraightEnemy(enemy_imgs[0], 200, 200, speed=220))
-enemies.append(CircleEnemy(enemy_imgs[1], tausta_leveys // 2 + 300, tausta_korkeus // 2,
-                           radius=180, angular_speed=2.2))
+enemy_bullets = []
+muzzles = []
+# Prefer ship frames from SpriteSettings if available, else fallback to the old folder images
+ship_frames = ss.ship_frames if hasattr(ss, 'ship_frames') and ss.ship_frames else None
+exhaust_turbo = ss.exhaust_turbo if hasattr(ss, 'exhaust_turbo') else []
+exhaust_normal = ss.exhaust_normal if hasattr(ss, 'exhaust_normal') else []
+shot_frames = ss.shot_frames if hasattr(ss, 'shot_frames') else []
+
+img0 = ship_frames[0] if ship_frames and len(ship_frames) > 0 else enemy_imgs[0]
+img1 = ship_frames[1] if ship_frames and len(ship_frames) > 1 else enemy_imgs[1]
+
+e1 = StraightEnemy(img0, 200, 200, speed=220)
+e1.exhaust_turbo = exhaust_turbo
+e1.exhaust_normal = exhaust_normal
+e1.shots = shot_frames
+enemies.append(e1)
+
+e2 = CircleEnemy(img1, tausta_leveys // 2 + 300, tausta_korkeus // 2, radius=180, angular_speed=2.2)
+e2.exhaust_turbo = exhaust_turbo
+e2.exhaust_normal = exhaust_normal
+e2.shots = shot_frames
+enemies.append(e2)
 
 
 planeetta_paikat = []
@@ -179,29 +212,46 @@ while run:
         
     # Piirrä viholliset
     for e in enemies:
-        e.update(dt, player, world_rect)
+            e.update(dt, player, world_rect)
+            # enemies may auto-shoot; bullets and muzzle animations appended to lists
+            try:
+                # BossEnemy supports targeting player for homing missiles
+                if isinstance(e, BossEnemy):
+                    e.maybe_shoot(dt, {'bullets': enemy_bullets, 'muzzles': muzzles}, player=player)
+                else:
+                    e.maybe_shoot(dt, {'bullets': enemy_bullets, 'muzzles': muzzles})
+            except Exception:
+                pass
 
     # Tarkista osumat pelaajaammuksien ja vihollisten välillä
     for bullet in list(player.weapons.bullets):
         for enemy in list(enemies):
             if bullet.rect.colliderect(enemy.rect):
-
-                # Poista ammus
+                # Remove player's bullet
                 if bullet in player.weapons.bullets:
                     player.weapons.bullets.remove(bullet)
 
-                # Boss kestää useita osumia
+                # Spawn explosion animation at enemy position (use shot_frames explode if available)
+                explode_list = shot_frames.get('explode') if isinstance(shot_frames, dict) else None
+                if explode_list:
+                    from EnemyHelpers import EnemyBullet
+                    exp = EnemyBullet(pygame.Vector2(enemy.rect.center), pygame.Vector2(0, 0),
+                                      start_frames=None, flight_frames=None, explode_frames=explode_list, speed=0)
+                    exp.explode()
+                    enemy_bullets.append(exp)
+
+                # Boss takes multiple hits
                 if isinstance(enemy, BossEnemy):
                     died = enemy.take_hit(1)
                     if died:
                         enemies.remove(enemy)
                         pistejarjestelma.lisaa_piste(5)  # boss-bonus
                 else:
-                    # Normaali vihollinen kuolee heti
+                    # Normal enemy dies immediately
                     enemies.remove(enemy)
                     pistejarjestelma.lisaa_piste(1)
 
-                break  # Siirry seuraavaan ammukseen
+                break  # move to next player bullet
 
     # Bossen ilmestyminen
     if (not boss_spawned) and pistejarjestelma.hae_pisteet() >= BOSS_TRIGGER_SCORE:
@@ -210,20 +260,75 @@ while run:
         boss = BossEnemy(
             boss_image,
             world_rect,
-            hp=12,
+            hp=100,
             enter_speed=280,
             move_speed=320
     )
 
-        enemies.append(boss)   
+        # give boss shot frames so it can spawn animated/homing bullets
+        boss.shots = shot_frames
+        enemies.append(boss)
 
     # Tarkista osumat vihollisten ja pelaajan välillä
     if enemy_hit_cooldown <= 0:
         for enemy in enemies:
             if player.rect.colliderect(enemy.rect):
+                # Compute separation normal from enemy to player
+                p_pos = pygame.Vector2(player.rect.center)
+                e_pos = pygame.Vector2(enemy.rect.center)
+                diff = p_pos - e_pos
+                if diff.length_squared() == 0:
+                    # fallback small random vector to avoid zero division
+                    diff = pygame.Vector2(random.uniform(-1.0, 1.0), random.uniform(-1.0, 1.0))
+                normal = diff.normalize()
+
+                # Push both entities apart so they "bounce" away from each other.
+                # Use a separation distance based on sprite sizes to avoid immediate re-collision.
+                separation = max(16, (player.rect.width + enemy.rect.width) * 0.25)
+                try:
+                    player.pos += normal * separation
+                    player.rect.center = (int(player.pos.x), int(player.pos.y))
+                except Exception:
+                    # fallback to rect-only position adjustments
+                    player.rect.centerx += int(normal.x * separation)
+                    player.rect.centery += int(normal.y * separation)
+
+                try:
+                    if hasattr(enemy, 'pos'):
+                        enemy.pos -= normal * separation
+                        enemy.rect.center = (int(enemy.pos.x), int(enemy.pos.y))
+                    else:
+                        enemy.rect.centerx -= int(normal.x * separation)
+                        enemy.rect.centery -= int(normal.y * separation)
+                except Exception:
+                    pass
+
+                # Apply simple velocity impulse: player gets a stronger impulse, enemy smaller opposite impulse
+                player_impulse = 220.0
+                enemy_impulse = 140.0
+                try:
+                    player.vel += normal * player_impulse
+                except Exception:
+                    try:
+                        # try setting vel attr if missing
+                        player.vel = pygame.Vector2(normal * player_impulse)
+                    except Exception:
+                        pass
+
+                try:
+                    if hasattr(enemy, 'vel'):
+                        enemy.vel -= normal * enemy_impulse
+                    else:
+                        # best-effort: for circular enemies, nudge their angle so they move away
+                        if hasattr(enemy, 'angle'):
+                            enemy.angle += math.pi * 0.5
+                except Exception:
+                    pass
+
+                # Deduct life and start cooldown
                 lives -= 1
                 enemy_hit_cooldown = enemy_hit_cooldown_duration
-                break  # Vain yksi osumistapahtuma per cooldown
+                break  # only one collision event per cooldown
 
     # Päivitä cooldown
     if enemy_hit_cooldown > 0:
@@ -235,6 +340,47 @@ while run:
 
     for e in enemies:
         e.draw(screen, camera_x, camera_y)
+
+    # Muzzle (paikka mistä ammus lähtee vihollisesta)
+    for m in list(muzzles):
+        try:
+            m.update(dt)
+            if getattr(m, 'dead', False):
+                muzzles.remove(m)
+                continue
+            m.draw(screen, camera_x, camera_y)
+        except Exception:
+            try:
+                muzzles.remove(m)
+            except Exception:
+                pass
+
+    #Päivitä osumat ja tee räjähdysanimaatio.
+    for b in list(enemy_bullets):
+        b.update(dt, world_rect)
+        if getattr(b, 'dead', False):
+            try:
+                enemy_bullets.remove(b)
+            except ValueError:
+                pass
+            continue
+        # törmäys pelaajaan. Trigger räjähdys ja poista ammus. Pelaaja menettää elämän.
+        if getattr(b, 'state', '') == 'flight' and b.rect.colliderect(player.rect):
+            # trigger explosion at bullet position and stop its movement
+            try:
+                b.explode()
+            except Exception:
+                # fallback: remove and decrement
+                try:
+                    enemy_bullets.remove(b)
+                except ValueError:
+                    pass
+            lives -= 1
+            continue
+
+    # Vihollisen ammuksen piirtoa
+    for b in enemy_bullets:
+        b.draw(screen, camera_x, camera_y)
 
 
     # Piirrä pelaaja kameran suhteessa
