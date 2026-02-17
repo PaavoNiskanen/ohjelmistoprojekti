@@ -6,7 +6,7 @@ from PLAYER_LUOKAT.PlayerWeapons import PlayerWeapons
 from PLAYER_LUOKAT.PlayerInput import PlayerInput
 
 class Player(pygame.sprite.Sprite):
-    def __init__(self, scale_factor, frames, x, y, boost_frames=None):
+    def __init__(self, scale_factor, frames, x, y, boost_frames=None, max_health: int = 5):
         super().__init__()
         self.scale_factor = scale_factor
         self.input = PlayerInput()
@@ -77,6 +77,11 @@ class Player(pygame.sprite.Sprite):
         self.hit_anim_duration = 200
         self.hit_flash_color = (255, 80, 80)
 
+        # collision-bounce lock: when true, player is immobilized for collision_bounce_timer seconds
+        self.collision_bounce_locked = False
+        self.collision_bounce_timer = 0
+        self.collision_bounce_duration = 1.3
+
         # Vahinko-animaatio
         self.damage_sprites = []
         self.damage_sprite_names = []
@@ -94,15 +99,30 @@ class Player(pygame.sprite.Sprite):
                 self.damage_sprites.append(pygame.transform.scale(img, (w, h)))
                 self.damage_sprite_names.append(fname)
 
+            # Health
+            self.max_health = int(max(1, max_health))
+            self.health = int(self.max_health)
+
 
     def update(self, dt):
         self.input.update()
+        # handle collision bounce timer: immobilize movement while active
+        if getattr(self, 'collision_bounce_locked', False):
+            try:
+                self.collision_bounce_timer -= dt
+                if self.collision_bounce_timer <= 0:
+                    self.collision_bounce_locked = False
+                    self.collision_bounce_timer = 0
+            except Exception:
+                pass
         self.update_destroyed_animation(dt)
         self.weapons.update(dt)
         self.update_hit_animation(dt)
         self.handle_attack_animation(dt)
         self.handle_animation(dt)
-        self.handle_movement(dt)
+        # skip movement while collision bounce lock is active
+        if not getattr(self, 'collision_bounce_locked', False):
+            self.handle_movement(dt)
 
     def update_destroyed_animation(self, dt):
         if self.is_destroyed:

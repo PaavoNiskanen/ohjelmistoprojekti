@@ -17,6 +17,7 @@ sys.path.append(os.path.dirname(__file__))
 from Player import Player
 from MainMenu import MainMenu
 from SpriteSettings import SpriteSettings
+from itertools import product
 
 
 # Näytä päävalikko ensin
@@ -39,6 +40,25 @@ print(sourceFileDir)
 pygame.init()
 Y = 800
 X = 1600
+
+# Health icon size (width, height) - change this to scale health HUD
+HEALTH_ICON_SIZE = (600, 200)
+# Margin from screen edges for HUD icons
+HEALTH_ICON_MARGIN = 16
+
+# Compute a safe icon size that won't run off the screen and preserve aspect
+# (will be used when loading/scale images)
+# Use window size `X,Y` and margin to limit maximum icon size
+max_w = max(1, X - 2 * HEALTH_ICON_MARGIN)
+max_h = max(1, Y - 2 * HEALTH_ICON_MARGIN)
+scale_w = max_w / HEALTH_ICON_SIZE[0]
+scale_h = max_h / HEALTH_ICON_SIZE[1]
+scale = min(scale_w, scale_h, 1.0)
+HEALTH_ICON_SCALE_SIZE = (max(1, int(HEALTH_ICON_SIZE[0] * scale)), max(1, int(HEALTH_ICON_SIZE[1] * scale)))
+
+# HUD position for health icon (top-right corner with margin)
+HEALTH_ICON_POS = (X - HEALTH_ICON_SCALE_SIZE[0] - HEALTH_ICON_MARGIN, HEALTH_ICON_MARGIN)
+
 
 
 screen = pygame.display.set_mode((X,Y))
@@ -92,6 +112,17 @@ ss.load_all()
 
 world_rect = pygame.Rect(0, 0, tausta_leveys, tausta_korkeus)
 
+# Collision and UI helpers moved to modules for modularity
+USE_SPATIAL_COLLISIONS = True
+from collisions import SpatialHash, apply_impact, separate, _get_pos
+from ui import draw_hud, draw_death_overlay
+from ui import init_enemy_health_bars, get_enemy_bar_images, draw_healthbar_custom
+import planets
+
+# Instantiate spatial hash and collision state
+spatial_hash = SpatialHash()
+collisions = set()
+
 enemies = []
 enemy_bullets = []
 muzzles = []
@@ -122,6 +153,21 @@ for _ in range(len(planeetat)):
     x = random.randint(0, max(0, tausta_leveys - 300))
     y = random.randint(0, max(0, tausta_korkeus - 300))
     planeetta_paikat.append((x, y))
+
+# Initialize planets helper (loads sprite and rotation state)
+try:
+    planets.init_planet(os.path.dirname(__file__), filename=None, height=96, rot_speed_deg=36.0)
+except Exception:
+    pass
+
+# Initialize enemy health bar images in UI module (modularized)
+try:
+    init_enemy_health_bars(os.path.dirname(__file__))
+except Exception:
+    try:
+        init_enemy_health_bars()
+    except Exception:
+        pass
 
 
 
@@ -157,12 +203,26 @@ player_start_x = tausta_leveys // 2
 player_start_y = tausta_korkeus // 2
 player_scale_multiplier = 10
 player_scale_factor = 0.5  # Skaalaa pelaaja puoleen kokoon
-player = Player(player_scale_factor, frames, player_start_x, player_start_y, boost_frames=boost_frames)
+player = Player(player_scale_factor, frames, player_start_x, player_start_y, boost_frames=boost_frames, max_health=5)
 
-# Pelaajan elämät
-lives = 3
+# Pelaajan elämät / health
+lives = player.health if hasattr(player, 'health') else 5
 enemy_hit_cooldown = 0
 enemy_hit_cooldown_duration = 1000  # 1 sekunti (millisekuntia)
+death_menu = False
+
+# Load health UI sprites (images/elementit/15.png .. 20.png)
+health_imgs = {}
+health_dir = os.path.join(os.path.dirname(__file__), 'images', 'elementit')
+for h in range(0, 6):
+    img_index = 15 + h
+    path = os.path.join(health_dir, f"{img_index}.png")
+    try:
+        img = pygame.image.load(path).convert_alpha()
+        img = pygame.transform.scale(img, HEALTH_ICON_SCALE_SIZE)
+        health_imgs[h] = img
+    except Exception:
+        health_imgs[h] = None
 
 # Kello frameratea ja animaatiota varten
 clock = pygame.time.Clock()
@@ -187,6 +247,10 @@ while run:
                 pause = True
     # rajoita framerate ja hae dt (millisekunteina)
     dt = clock.tick(60)
+    try:
+        planets.update_planet(dt)
+    except Exception:
+        pass
 
     # Päivitä pelaaja (animaatio + näppäinliike)
     player.update(dt)
@@ -205,6 +269,13 @@ while run:
     # Piirrä tausta kameran kohdalta
     screen.blit(tausta, (0, 0), area=(camera_x, camera_y, X, Y))
 
+    # Draw a large rotating decorative planet always visible (screen coords)
+    try:
+        # centered near top-middle; change values if you want different position
+        planets.draw_planet_screen(screen, X // 2, 140, height=3200, gap=0)
+    except Exception:
+        pass
+
     # Piirrä planeetat kameran offsetilla
     for kuva, (x, y) in zip(planeetat, planeetta_paikat):
         screen.blit(kuva, (x - camera_x, y - camera_y))
@@ -221,6 +292,71 @@ while run:
                     e.maybe_shoot(dt, {'bullets': enemy_bullets, 'muzzles': muzzles})
             except Exception:
                 pass
+
+    # Draw boss health bars in the left margin of the canvas (stacked)
+    bosses = [be for be in enemies if isinstance(be, BossEnemy)]
+    for idx, e in enumerate(bosses):
+        try:
+            # Simple explicit sizes and positions for fill and frame
+            margin = 16
+            fill_w, fill_h = 20, 40
+            frame_w, frame_h = 340, 56
+            frame_x = margin
+            frame_y = margin + idx * (frame_h + 8)
+            # center fill inside frame
+            fill_x = frame_x + (frame_w - fill_w) // 2
+            fill_y = frame_y + (frame_h - fill_h) // 2
+
+            cur_hp = getattr(e, 'hp', getattr(e, 'health', getattr(e, 'HP', 0)))
+            max_hp = getattr(e, 'max_hp', getattr(e, 'max_health', getattr(e, 'HP_MAX', cur_hp)))
+
+            imgs = get_enemy_bar_images()
+            draw_healthbar_custom(screen,
+                                  fill_w, fill_h,
+                                  fill_x, fill_y,
+                                  frame_w, frame_h,
+                                  frame_x, frame_y,
+                                  cur_hp, max_hp,
+                                  imgs=imgs,
+                                  tint=(255,40,40))
+        except Exception:
+            pass
+
+    # Optional: handle enemy-enemy collisions using spatial hash
+    if USE_SPATIAL_COLLISIONS and len(enemies) > 1:
+        try:
+            # rebuild spatial hash from current enemy list
+            spatial_hash.items = set(enemies)
+            spatial_hash.rebuild()
+
+            prev_collisions = collisions
+            collisions = set()
+
+            for b in enemies:
+                possible = spatial_hash.query(b.rect)
+                for a in possible:
+                    if a is b:
+                        continue
+                    # compute simple circle overlap test
+                    pa = _get_pos(a)
+                    pb = _get_pos(b)
+                    minsep = (getattr(a, 'radius', max(a.rect.width, a.rect.height) * 0.5) +
+                             getattr(b, 'radius', max(b.rect.width, b.rect.height) * 0.5))
+                    if pa.distance_squared_to(pb) < (minsep * minsep):
+                        # canonical pair ordering
+                        pair = (a, b) if id(a) < id(b) else (b, a)
+                        if pair not in prev_collisions:
+                            apply_impact(*pair)
+                        collisions.add(pair)
+
+            # separate with a few iterations for stability
+            for _ in range(8):
+                collisions = {(a, b) for (a, b) in collisions if not separate(a, b)}
+                if not collisions:
+                    break
+        except Exception:
+            # fail safe: continue without spatial collisions
+            collisions = set()
 
     # Tarkista osumat pelaajaammuksien ja vihollisten välillä
     for bullet in list(player.weapons.bullets):
@@ -280,103 +416,140 @@ while run:
                     # fallback small random vector to avoid zero division
                     diff = pygame.Vector2(random.uniform(-1.0, 1.0), random.uniform(-1.0, 1.0))
                 normal = diff.normalize()
-
-                # Push both entities apart so they "bounce" away from each other.
-                # Use a separation distance based on sprite sizes to avoid immediate re-collision.
-                separation = max(16, (player.rect.width + enemy.rect.width) * 0.25)
+                # Compute desired separation to place ships at touching radii
                 try:
-                    player.pos += normal * separation
-                    player.rect.center = (int(player.pos.x), int(player.pos.y))
+                    p_radius = max(player.rect.width, player.rect.height) * 0.5
                 except Exception:
-                    # fallback to rect-only position adjustments
-                    player.rect.centerx += int(normal.x * separation)
-                    player.rect.centery += int(normal.y * separation)
-
+                    p_radius = max(player.rect.width, player.rect.height) * 0.5
                 try:
-                    if hasattr(enemy, 'pos'):
-                        enemy.pos -= normal * separation
-                        enemy.rect.center = (int(enemy.pos.x), int(enemy.pos.y))
-                    else:
-                        enemy.rect.centerx -= int(normal.x * separation)
-                        enemy.rect.centery -= int(normal.y * separation)
+                    e_radius = max(enemy.rect.width, enemy.rect.height) * 0.5
                 except Exception:
-                    pass
+                    e_radius = max(enemy.rect.width, enemy.rect.height) * 0.5
 
-                # Mass-based impulse along collision normal (1D impulse resolution)
-                # Ensure both entities have velocity vectors
-                p_vel = getattr(player, 'vel', None)
-                if p_vel is None:
-                    try:
-                        player.vel = pygame.Vector2(0, 0)
-                        p_vel = player.vel
-                    except Exception:
-                        p_vel = pygame.Vector2(0, 0)
-
-                e_vel = getattr(enemy, 'vel', None)
-                if e_vel is None:
-                    try:
-                        enemy.vel = pygame.Vector2(0, 0)
-                        e_vel = enemy.vel
-                    except Exception:
-                        e_vel = pygame.Vector2(0, 0)
+                desired_dist = p_radius + e_radius + 2.0
 
                 # masses (defaults)
                 m1 = float(getattr(player, 'mass', 3.0))
-                m2 = float(getattr(enemy, 'mass', 2.0))
+                m2 = float(getattr(enemy, 'mass', 1.0))
+                total = max(1e-6, (m1 + m2))
 
-                # relative velocity along normal
-                v_rel = p_vel - e_vel
-                vel_along_normal = v_rel.dot(normal)
+                dist = diff.length()
+                overlap = desired_dist - dist
 
-                # restitution (bounciness)
-                restitution = 0.5
-
-                # If velocities are separating already, still apply a small corrective impulse to push apart
-                # Compute impulse scalar j
-                denom = (1.0 / m1) + (1.0 / m2)
-                j = 0.0
-                # Use negative vel_along_normal (approach) or, if zero/positive, apply a corrective nudge
-                if vel_along_normal < 0:
-                    j = -(1.0 + restitution) * vel_along_normal / denom
+                if overlap > 0:
+                    # move apart proportional to masses (heavier moves less)
+                    p_move = normal * (overlap * (m2 / total))
+                    e_move = -normal * (overlap * (m1 / total))
+                    new_p = p_pos + p_move
+                    new_e = e_pos + e_move
                 else:
-                    # small separation impulse proportional to overlap/separation distance
-                    j = (max(8.0, separation) * 0.5) / denom
+                    # already separated; nudge so centers are at desired distance (centered proportionally)
+                    correction = desired_dist - dist
+                    p_move = normal * (correction * (m2 / total))
+                    e_move = -normal * (correction * (m1 / total))
+                    new_p = p_pos + p_move
+                    new_e = e_pos + e_move
 
-                # clamp impulse to avoid extreme values
-                j = max(min(j, 2000.0), -2000.0)
-
-                # apply impulse
+                # If the enemy is essentially stationary, trigger a 2-oscillation collision bounce
+                e_vel = getattr(enemy, 'vel', pygame.Vector2(0, 0))
+                e_speed = 0.0
                 try:
-                    player.vel = pygame.Vector2(p_vel + (j * normal) / m1)
+                    e_speed = float(e_vel.length())
                 except Exception:
                     try:
-                        player.vel = pygame.Vector2((j * normal) / m1)
+                        e_speed = float((pygame.Vector2(e_vel)).length())
+                    except Exception:
+                        e_speed = 0.0
+
+                try:
+                    player.pos = pygame.Vector2(new_p)
+                    player.rect.center = (int(player.pos.x), int(player.pos.y))
+                except Exception:
+                    try:
+                        player.rect.center = (int(new_p.x), int(new_p.y))
                     except Exception:
                         pass
 
+                # Reduce player forward speed to 30% of previous
                 try:
-                    # If enemy supports apply_push (e.g. CircleEnemy), use that for a short positional push
-                    push_vec = - (j * normal) / m2
-                    if hasattr(enemy, 'apply_push'):
-                        try:
-                            enemy.apply_push(push_vec, duration=0.5)
-                        except Exception:
-                            # fallback to setting velocity if available
-                            if hasattr(enemy, 'vel'):
-                                enemy.vel = pygame.Vector2(e_vel - push_vec)
-                            elif hasattr(enemy, 'angle'):
-                                enemy.angle += math.pi * 0.5
-                    else:
-                        if hasattr(enemy, 'vel'):
-                            enemy.vel = pygame.Vector2(e_vel - push_vec)
-                        else:
-                            if hasattr(enemy, 'angle'):
-                                enemy.angle += math.pi * 0.5
+                    if getattr(player, 'vel', None) is not None:
+                        player.vel = pygame.Vector2(player.vel) * 0.3
                 except Exception:
                     pass
 
-                # Deduct life and start cooldown
-                lives -= 1
+                # Stationary enemy: start a bounce animation that oscillates twice and then settles at new_e
+                if e_speed < 1.0:
+                    try:
+                        # initial_disp = current_pos - base_pos so that position at t=0 equals current pos
+                        init_disp = pygame.Vector2(e_pos) - pygame.Vector2(new_e)
+                        # start collision bounce: 2 oscillations, gentle damping, duration ~1.6s
+                        enemy.start_collision_bounce(new_e, init_disp, duration=1.6, oscillations=2.0, damping=2.2)
+                        # ensure AI doesn't move during this (handled by collision_bounce_active)
+                        try:
+                            enemy.vel = pygame.Vector2(0, 0)
+                        except Exception:
+                            pass
+                    except Exception:
+                        # fallback: anchor as before
+                        try:
+                            if hasattr(enemy, 'pos'):
+                                enemy.pos = pygame.Vector2(new_e)
+                                enemy.rect.center = (int(enemy.pos.x), int(enemy.pos.y))
+                            else:
+                                enemy.rect.center = (int(new_e.x), int(new_e.y))
+                            enemy.collision_bounce_locked = True
+                            enemy.collision_bounce_timer = getattr(enemy, 'collision_bounce_duration', 1.3)
+                            enemy.collision_bounce_target = pygame.Vector2(new_e)
+                            try:
+                                enemy.vel = pygame.Vector2(0, 0)
+                            except Exception:
+                                pass
+                        except Exception:
+                            pass
+                else:
+                    # moving enemy: apply an impulse so both ships are pushed apart
+                    try:
+                        # ensure player is at new_p (nudge)
+                        try:
+                            player.pos = pygame.Vector2(new_p)
+                            player.rect.center = (int(player.pos.x), int(player.pos.y))
+                        except Exception:
+                            try:
+                                player.rect.center = (int(new_p.x), int(new_p.y))
+                            except Exception:
+                                pass
+
+                        # Try to use the generic apply_impact impulse routine
+                        try:
+                            apply_impact(player, enemy, elasticity=0.85)
+                        except Exception:
+                            # fallback: nudge enemy position proportionally (already computed new_e)
+                            try:
+                                if hasattr(enemy, 'pos'):
+                                    enemy.pos = pygame.Vector2(new_e)
+                                    enemy.rect.center = (int(enemy.pos.x), int(enemy.pos.y))
+                                else:
+                                    enemy.rect.center = (int(new_e.x), int(new_e.y))
+                            except Exception:
+                                pass
+
+                        # small separation step to avoid re-sticking
+                        try:
+                            separate(player, enemy, frac=0.9)
+                        except Exception:
+                            pass
+                    except Exception:
+                        pass
+
+                # Deduct life (prefer player's health) and start cooldown
+                try:
+                    if hasattr(player, 'health'):
+                        player.health = max(0, int(player.health) - 1)
+                        lives = player.health
+                    else:
+                        lives -= 1
+                except Exception:
+                    lives -= 1
                 enemy_hit_cooldown = enemy_hit_cooldown_duration
                 break  # only one collision event per cooldown
 
@@ -384,9 +557,9 @@ while run:
     if enemy_hit_cooldown > 0:
         enemy_hit_cooldown -= dt
 
-    # Tarkista pelin loppu
+    # Tarkista pelin loppu -> näytä death menu instead of immediate quit
     if lives <= 0:
-        run = False
+        death_menu = True
 
     for e in enemies:
         e.draw(screen, camera_x, camera_y)
@@ -425,7 +598,15 @@ while run:
                     enemy_bullets.remove(b)
                 except ValueError:
                     pass
-            lives -= 1
+            # decrement player's health if available, else decrement lives
+            try:
+                if hasattr(player, 'health'):
+                    player.health = max(0, int(player.health) - 1)
+                    lives = player.health
+                else:
+                    lives -= 1
+            except Exception:
+                lives -= 1
             continue
 
     # Vihollisen ammuksen piirtoa
@@ -439,10 +620,118 @@ while run:
     # Näytä pisteet vasemmassa yläkulmassa.
     pistejarjestelma.show_score(10, 10, pygame.font.SysFont('Arial', 24), screen)
 
-    # Näytä elämät oikeassa yläkulmassa
+    # Näytä elämät / health sprites oikeassa yläkulmassa
     font = pygame.font.SysFont('Arial', 24)
-    lives_text = font.render(f"Elämät: {lives}", True, (255, 255, 255))
-    screen.blit(lives_text, (X - 200, 10))
+    try:
+        # prefer player's health if present
+        cur_health = lives
+        max_h = 5
+        if hasattr(player, 'health'):
+            cur_health = int(max(0, min(player.health, getattr(player, 'max_health', 5))))
+            max_h = int(getattr(player, 'max_health', 5))
+
+        hud_img = None
+        if isinstance(health_imgs, dict):
+            if max_h > 0 and max_h != 5:
+                slot = int(round((cur_health / max_h) * 5))
+            else:
+                slot = int(max(0, min(cur_health, 5)))
+            hud_img = health_imgs.get(slot)
+
+        if hud_img:
+            try:
+                pos = HEALTH_ICON_POS
+                screen.blit(hud_img, pos)
+            except Exception:
+                screen.blit(hud_img, HEALTH_ICON_POS)
+        else:
+            lives_text = font.render(f"Elämät: {cur_health}", True, (255, 255, 255))
+            screen.blit(lives_text, (X - 200, 10))
+    except Exception:
+        lives_text = font.render(f"Elämät: {lives}", True, (255, 255, 255))
+        screen.blit(lives_text, (X - 200, 10))
+
+    # Death overlay (Restart / Quit)
+    if death_menu:
+        overlay = pygame.Surface((X, Y))
+        overlay.set_alpha(220)
+        overlay.fill((10, 10, 10))
+        screen.blit(overlay, (0, 0))
+
+        font_large = pygame.font.SysFont('Arial', 48)
+        font_small = pygame.font.SysFont('Arial', 28)
+        title = font_large.render("", True, (220, 80, 80))
+        # center the title and buttons using the actual screen rect
+        screen_rect = screen.get_rect()
+        cx, cy = screen_rect.center
+        title_rect = title.get_rect(center=(cx, cy - 100))
+        screen.blit(title, title_rect.topleft)
+
+        btn_w, btn_h = 320, 64
+        restart_btn = pygame.Rect(0, 0, btn_w, btn_h)
+        quit_btn = pygame.Rect(0, 0, btn_w, btn_h)
+        restart_btn.center = (cx, cy)
+        quit_btn.center = (cx, cy + btn_h + 16)
+
+        pygame.draw.rect(screen, (70, 150, 70), restart_btn)
+        pygame.draw.rect(screen, (150, 70, 70), quit_btn)
+
+        # draw button labels centered
+        restart_label = font_small.render("Restart", True, (255, 255, 255))
+        quit_label = font_small.render("Quit", True, (255, 255, 255))
+        screen.blit(restart_label, restart_label.get_rect(center=restart_btn.center).topleft)
+        screen.blit(quit_label, quit_label.get_rect(center=quit_btn.center).topleft)
+
+        pygame.display.update()
+
+        # modal loop for death menu
+        in_death = True
+        while in_death:
+            for ev in pygame.event.get():
+                if ev.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                if ev.type == pygame.MOUSEBUTTONDOWN and ev.button == 1:
+                    mx, my = ev.pos
+                    if restart_btn.collidepoint(mx, my):
+                        # reset player health and position, clear enemies and reset cooldown
+                        try:
+                            player.health = int(getattr(player, 'max_health', 5))
+                            lives = player.health
+                        except Exception:
+                            lives = 5
+                        try:
+                            player.pos = pygame.Vector2(player_start_x, player_start_y)
+                            player.rect.center = (int(player.pos.x), int(player.pos.y))
+                            player.vel = pygame.Vector2(0, 0)
+                        except Exception:
+                            pass
+                        # recreate simple enemies
+                        enemies.clear()
+                        try:
+                            ne1 = StraightEnemy(img0, 200, 200, speed=220)
+                            ne1.exhaust_turbo = exhaust_turbo
+                            ne1.exhaust_normal = exhaust_normal
+                            ne1.shots = shot_frames
+                            enemies.append(ne1)
+                            ne2 = CircleEnemy(img1, tausta_leveys // 2 + 300, tausta_korkeus // 2, radius=180, angular_speed=2.2)
+                            ne2.exhaust_turbo = exhaust_turbo
+                            ne2.exhaust_normal = exhaust_normal
+                            ne2.shots = shot_frames
+                            enemies.append(ne2)
+                        except Exception:
+                            pass
+                        enemy_hit_cooldown = 0
+                        death_menu = False
+                        in_death = False
+                        break
+                    elif quit_btn.collidepoint(mx, my):
+                        pygame.quit()
+                        sys.exit()
+                if ev.type == pygame.KEYDOWN and ev.key == pygame.K_ESCAPE:
+                    pygame.quit()
+                    sys.exit()
+        continue  # skip normal frame logic while death menu handled
 
     # Pause overlay
     if pause:

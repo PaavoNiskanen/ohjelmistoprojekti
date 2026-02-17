@@ -49,9 +49,15 @@ class StraightEnemy(Enemy):
         # simple bounce settings: when colliding with world bounds, perform a short bounce
         self.simple_bounce = True
         self.bouncing = False
-        self.bounce_duration = 0.5  # seconds
+        self.bounce_duration = 2.0  # seconds (longer, calmer bounce)
         self.bounce_timer = 0.0
         self.bounce_initial_vel = pygame.Vector2(0, 0)
+        # Bounce tuning: strength scales initial reverse impulse,
+        # oscillations = how many half-oscillations over duration,
+        # damping controls how quickly oscillation amplitude decays.
+        self.bounce_strength = 1.8
+        self.bounce_oscillations = 2.0
+        self.bounce_damping = 2.2
         # gravity / attraction settings
         self.gravity_enabled = False
         self.gravity_center = pygame.Vector2(0, 0)
@@ -72,8 +78,8 @@ class StraightEnemy(Enemy):
 
         # Magneettinen vetovoima pelaajaan, joka saa vihollisen kiertämään pelaajaa ja yrittämään osua siihen. Vältetään seinäkiinnittymistä ja luodaan dynaamisempi liike.
         self.magnet_enabled = True
-        self.magnet_radius = float(params.get('magnet_radius', 420.0))
-        self.magnet_strength = float(params.get('magnet_strength', 220.0))
+        self.magnet_radius = float(params.get('magnet_radius', 1000.0))
+        self.magnet_strength = float(params.get('magnet_strength', 400.0))
         self.magnet_min_distance = float(params.get('magnet_min_distance', 48.0))
 
     def update(self, dt_ms, player=None, world_rect=None):
@@ -81,6 +87,34 @@ class StraightEnemy(Enemy):
         super().update(dt_ms, player, world_rect)
 
         dt = dt_ms / 1000.0
+
+        # If in simple bounce state, apply a damped oscillation (rubberband) to the bounce velocity
+        if getattr(self, 'bouncing', False):
+            try:
+                # decrease timer
+                self.bounce_timer -= dt
+                # elapsed time since bounce start
+                elapsed = float(self.bounce_duration) - max(0.0, float(self.bounce_timer))
+                # normalized time in [0, bounce_duration]
+                T = max(1e-6, float(self.bounce_duration))
+                # oscillation frequency (rad/s)
+                freq = float(getattr(self, 'bounce_oscillations', 2.0))
+                omega = 2.0 * math.pi * (freq / T)
+                # damping factor (controls exponential envelope)
+                damping = float(getattr(self, 'bounce_damping', 2.2))
+                envelope = math.exp(- (damping * elapsed) / T)
+                # damped cosine oscillation (starts at 1.0 and oscillates)
+                osc = math.cos(omega * elapsed)
+                self.vel = pygame.Vector2(self.bounce_initial_vel) * (envelope * osc)
+                # finish bounce when timer expired
+                if self.bounce_timer <= 0.0:
+                    self.bouncing = False
+                    self.bounce_timer = 0.0
+                    self.vel = pygame.Vector2(0, 0)
+                # keep legacy vx/vy in sync for any animation code relying on them
+                self.vx, self.vy = float(self.vel.x), float(self.vel.y)
+            except Exception:
+                pass
 
         # Figure-8 pathing: deterministic looping pattern that avoids wall-sticking
         if getattr(self, 'path_type', 'random') == 'figure8':
@@ -239,22 +273,37 @@ class StraightEnemy(Enemy):
                         normal = pygame.Vector2(0, -1)
                     sep = pen + 1.0
 
-                # Separate out of collision along normal
+                # Separate out of collision along normal. Push a bit extra to avoid
+                # persistent contact when velocities are nearly tangent.
                 try:
-                    self.pos += normal * sep
+                    extra_push = max(4.0, min(32.0, pen * 0.5))
+                    self.pos += normal * (sep + extra_push)
                 except Exception:
                     pass
                 self.rect.center = (int(self.pos.x), int(self.pos.y))
 
-                # Simple short bounce: reverse direction and decay to zero over bounce_duration
+                # Simple short bounce: apply an outward impulse along the collision normal
+                # (not merely reversing the possibly-tangential velocity) so the enemy
+                # is reliably pushed away from the wall.
                 if getattr(self, 'simple_bounce', True):
                     v = pygame.Vector2(self.vel)
-                    # initial bounce velocity: reverse direction, scale down a bit
+                    # compute normal-aligned component of current velocity
+                    v_norm_comp = v.dot(normal)
+                    # ensure a meaningful outward speed: prefer a scaled normal component,
+                    # but guarantee a minimum impulse based on enemy speed
+                    base_min = float(self.speed) * 0.6
+                    impulse_speed = max(abs(v_norm_comp) * float(getattr(self, 'bounce_strength', 1.8)), base_min, 120.0)
+                    # initial impulse points outward along normal
                     self.bouncing = True
                     self.bounce_timer = float(self.bounce_duration)
-                    self.bounce_initial_vel = -v * 0.8
-                    # immediately apply initial bounce velocity
+                    self.bounce_initial_vel = normal * impulse_speed
+                    # immediately apply initial bounce velocity and clamp
                     self.vel = pygame.Vector2(self.bounce_initial_vel)
+                    if getattr(self, 'max_speed', None) and self.vel.length() > self.max_speed:
+                        try:
+                            self.vel.scale_to_length(self.max_speed)
+                        except Exception:
+                            pass
                     self.vx, self.vy = float(self.vel.x), float(self.vel.y)
                 else:
                     # Physically based reflection: v' = v - (1 + e) (v·n) n
