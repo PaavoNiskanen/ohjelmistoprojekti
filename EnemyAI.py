@@ -329,6 +329,13 @@ class CircleEnemy(Enemy):
         vy = math.cos(self.angle) * self.base_angular_speed * self.radius
         self.display_angle = math.atan2(-vy, vx)
 
+        # Physics / external push support
+        self.mass = 1.0
+        # push system: linear-decay push applied to position for short durations
+        self._push_initial = pygame.Vector2(0, 0)
+        self._push_elapsed = 0.0
+        self._push_duration = 0.0
+
         # behavior state for simple, readable speed control
         self._behavior = 'normal'
         self._behavior_timer = 0.0
@@ -384,12 +391,34 @@ class CircleEnemy(Enemy):
         )
         self.rect.center = (int(self.pos.x), int(self.pos.y))
 
+        # If an external short push is active, apply it as a position offset that decays linearly
+        if self._push_duration > 0.0 and self._push_elapsed < self._push_duration:
+            t = self._push_elapsed / max(1e-6, self._push_duration)
+            # current push vector decays linearly from initial to zero
+            current_push = self._push_initial * (1.0 - t)
+            self.pos += current_push * dt
+            self.rect.center = (int(self.pos.x), int(self.pos.y))
+            self._push_elapsed += dt
+
         # update facing based on instantaneous tangent direction
         vx = -math.sin(self.angle) * angular_speed * self.radius
         vy = math.cos(self.angle) * angular_speed * self.radius
         if abs(vx) > 1e-6 or abs(vy) > 1e-6:
             target = math.atan2(-vy, vx)
             self._update_display_angle(dt_ms, target)
+
+    def apply_push(self, impulse_vec: pygame.Vector2, duration: float = 0.5):
+        """Apply a short-lived positional push to the circle enemy.
+
+        The push decays linearly to zero over `duration` seconds. `impulse_vec` is
+        interpreted as an initial velocity-like offset (px/s) applied to position.
+        """
+        try:
+            self._push_initial = pygame.Vector2(impulse_vec)
+            self._push_elapsed = 0.0
+            self._push_duration = max(0.001, float(duration))
+        except Exception:
+            pass
 
     def draw(self, screen: pygame.Surface, camera_x: int, camera_y: int):
         # keep sprite visually upright (no rotation)

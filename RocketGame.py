@@ -321,8 +321,8 @@ while run:
                         e_vel = pygame.Vector2(0, 0)
 
                 # masses (defaults)
-                m1 = float(getattr(player, 'mass', 1.0))
-                m2 = float(getattr(enemy, 'mass', 1.0))
+                m1 = float(getattr(player, 'mass', 3.0))
+                m2 = float(getattr(enemy, 'mass', 2.0))
 
                 # relative velocity along normal
                 v_rel = p_vel - e_vel
@@ -355,12 +355,23 @@ while run:
                         pass
 
                 try:
-                    if hasattr(enemy, 'vel'):
-                        enemy.vel = pygame.Vector2(e_vel - (j * normal) / m2)
+                    # If enemy supports apply_push (e.g. CircleEnemy), use that for a short positional push
+                    push_vec = - (j * normal) / m2
+                    if hasattr(enemy, 'apply_push'):
+                        try:
+                            enemy.apply_push(push_vec, duration=0.5)
+                        except Exception:
+                            # fallback to setting velocity if available
+                            if hasattr(enemy, 'vel'):
+                                enemy.vel = pygame.Vector2(e_vel - push_vec)
+                            elif hasattr(enemy, 'angle'):
+                                enemy.angle += math.pi * 0.5
                     else:
-                        # fallback: nudge circular enemies' angle
-                        if hasattr(enemy, 'angle'):
-                            enemy.angle += math.pi * 0.5
+                        if hasattr(enemy, 'vel'):
+                            enemy.vel = pygame.Vector2(e_vel - push_vec)
+                        else:
+                            if hasattr(enemy, 'angle'):
+                                enemy.angle += math.pi * 0.5
                 except Exception:
                     pass
 
