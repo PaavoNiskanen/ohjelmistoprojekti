@@ -10,14 +10,14 @@ import os
 import pygame
 import random
 #from player import Player
-from enemy import StraightEnemy, CircleEnemy, DownEnemy, UpEnemy, DownEnemy, UpEnemy
+from Enemies.enemy import StraightEnemy, CircleEnemy, DownEnemy, UpEnemy, DownEnemy, UpEnemy
 from boss_enemy import BossEnemy
 from points import Points
 sys.path.append(os.path.dirname(__file__))
 from Player import Player
 from player2 import Player2
-from MainMenu import MainMenu
-from gameOver import GameOverScreen
+from Valikot.MainMenu import MainMenu
+from Valikot.gameOver import GameOverScreen
 from SpriteSettings import SpriteSettings
 from itertools import product
 

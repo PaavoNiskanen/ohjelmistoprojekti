@@ -7,7 +7,7 @@ import os
 # Lisää ohjelmiston hakemisto Python-polkuun
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from MainMenu import MainMenu
+from Valikot.MainMenu import MainMenu
 import pygame
 
 def main():

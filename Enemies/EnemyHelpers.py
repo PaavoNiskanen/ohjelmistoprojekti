@@ -11,7 +11,7 @@ import pygame
 from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from enemy import Enemy
+    from Enemies.enemy import Enemy
 
 
     # Tässä luokassa ladataan vihollisten sprite-kuvat ja hallitaan vihollisten ammuksia 

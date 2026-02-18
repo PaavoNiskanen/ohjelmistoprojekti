@@ -1,5 +1,5 @@
 import pygame
-from enemy import Enemy
+from Enemies.enemy import Enemy
 from ui import get_enemy_bar_images, draw_healthbar_custom
 
 class BossEnemy(Enemy):
