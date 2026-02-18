@@ -16,6 +16,7 @@ from points import Points
 sys.path.append(os.path.dirname(__file__))
 from Player import Player
 from MainMenu import MainMenu
+from gameOver import GameOverScreen
 from SpriteSettings import SpriteSettings
 from itertools import product
 
@@ -265,6 +266,9 @@ for h in range(0, 6):
 
 # Kello frameratea ja animaatiota varten
 clock = pygame.time.Clock()
+
+# Luodaan Game Over -näyttöolio.
+game_over_screen = GameOverScreen(screen)
 
 # Alusta kamera ennen silmukkaa
 camera_x = 0
@@ -580,6 +584,36 @@ while run:
 
     # Tarkista pelin loppu -> näytä death menu instead of immediate quit
     if lives <= 0:
+        game_over_screen.show(X, Y)
+        game_over = game_over_screen.run()
+        if game_over == "play_again":
+            # Nollataan peli (pelaaja, viholliset, pisteet, elämät).
+            # Pelaaja takaisin keskelle, viholliset uudestaan, pisteet nollaan, elämiä 3.
+            player.rect.center = (player_start_x, player_start_y)
+            enemies = [
+                StraightEnemy(enemy_imgs[0], 200, 200, speed=220),
+                CircleEnemy(enemy_imgs[1], tausta_leveys // 2 + 300, tausta_korkeus // 2,
+                            radius=180, angular_speed=2.2)
+            ]
+            lives = 3
+            pistejarjestelma.score = 0
+        elif game_over == "main_menu":
+            # Näytetään päävalikko uudestaan.
+            menu = MainMenu()
+            result = menu.run()
+            if result != "start_game":
+                run = False
+            # Nollataan peli päävalikkoon palattaessa.
+            player.rect.center = (player_start_x, player_start_y)
+            enemies = [
+                StraightEnemy(enemy_imgs[0], 200, 200, speed=220),
+                CircleEnemy(enemy_imgs[1], tausta_leveys // 2 + 300, tausta_korkeus // 2,
+                            radius=180, angular_speed=2.2)
+            ]
+            lives = 3
+            pistejarjestelma.score = 0
+        elif game_over == "quit":
+            run = False
         death_menu = True
 
     for e in enemies:
