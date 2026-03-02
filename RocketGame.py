@@ -113,6 +113,39 @@ boss_image = pygame.transform.scale(
 
 world_rect = pygame.Rect(0, 0, tausta_leveys, tausta_korkeus)
 
+# bossin räjädysanimaation frames
+import re
+from explosion import Explosion
+
+explosions = []
+
+def load_explosion_frames():
+    frames = []
+    folder = os.path.join(os.path.dirname(__file__),
+                          "enemy-sprite",
+                          "PNG_Parts&Spriter_Animation",
+                          "Explosions",
+                          "Explosion1")
+
+    pat = re.compile(r"000_Explosion1_(\d+)_0\.png", re.IGNORECASE)
+
+    items = []
+    for fn in os.listdir(folder):
+        m = pat.match(fn)
+        if m:
+            items.append((int(m.group(1)), fn))
+
+    items.sort(key=lambda x: x[0])
+
+    for _, fn in items:
+        img = pygame.image.load(os.path.join(folder, fn)).convert_alpha()
+        img = pygame.transform.scale(img, (200, 200))
+        frames.append(img)
+
+    return frames
+
+explosion_frames = load_explosion_frames()
+
 # Collision and UI helpers moved to modules for modularity
 USE_SPATIAL_COLLISIONS = True
 from collisions import SpatialHash, apply_impact, separate, _get_pos
@@ -201,6 +234,18 @@ def restart_current_wave():
 
     pygame.event.clear()
 
+def spawn_inside_edge(edge, inset=80):
+    # inset = kuinka paljon sisällä reunasta
+    if edge == "left":
+        return inset, random.randint(inset, tausta_korkeus - inset)
+    if edge == "right":
+        return tausta_leveys - inset, random.randint(inset, tausta_korkeus - inset)
+    if edge == "top":
+        return random.randint(inset, tausta_leveys - inset), inset
+    if edge == "bottom":
+        return random.randint(inset, tausta_leveys - inset), tausta_korkeus - inset
+    return random.randint(inset, tausta_leveys - inset), random.randint(inset, tausta_korkeus - inset)
+
 def spawn_wave(wave_num):
     """Spawns enemies based on the wave number"""
     global enemies
@@ -230,11 +275,19 @@ def spawn_wave(wave_num):
         enemies.append(e2)
     
     elif wave_num == 2:
-        # Wave 2: 3 enemies moving randomly
-        for i in range(3):
-            x = random.randint(100, tausta_leveys - 100)
-            y = random.randint(100, tausta_korkeus - 100)
-            enemies.append(StraightEnemy(enemy_imgs[i % len(enemy_imgs)], x, y, speed=200))
+        edges = ["right", "top", "left"]
+        for i, edge in enumerate(edges):
+            x, y = spawn_inside_edge(edge, inset=80)
+            e = StraightEnemy(enemy_imgs[i % len(enemy_imgs)], x, y, speed=220)
+
+            # anna satunnainen lähtösuunta ettei se jää sahaamaan reunaa
+            if hasattr(e, "vel"):
+                v = pygame.Vector2(random.uniform(-1, 1), random.uniform(-1, 1))
+                if v.length_squared() == 0:
+                    v = pygame.Vector2(1, 0)
+                e.vel = v.normalize() * 220
+
+            enemies.append(e)
     
     elif wave_num == 3:
         # Wave 3: 5 enemies - 3 moving from top to bottom, 2 moving from bottom to top
@@ -267,6 +320,27 @@ def spawn_wave(wave_num):
 enemy_bullets = []
 muzzles = []
 spawn_wave(current_wave)
+
+def force_unstick(a, b, eps=2):
+    pa = pygame.Vector2(a.rect.center)
+    pb = pygame.Vector2(b.rect.center)
+    d = pb - pa
+
+    if d.length_squared() == 0:
+        d = pygame.Vector2(1, 0)
+
+    n = d.normalize()
+
+    a.rect.centerx -= int(n.x * eps)
+    a.rect.centery -= int(n.y * eps)
+    b.rect.centerx += int(n.x * eps)
+    b.rect.centery += int(n.y * eps)
+
+    # jos enemy käyttää pos-vektoria, synkkaa se
+    if hasattr(a, "pos"):
+        a.pos = pygame.Vector2(a.rect.center)
+    if hasattr(b, "pos"):
+        b.pos = pygame.Vector2(b.rect.center)
 
 
 planeetta_paikat = []
@@ -492,8 +566,19 @@ while run:
                         collisions.add(pair)
 
             # separate with a few iterations for stability
-            for _ in range(8):
-                collisions = {(a, b) for (a, b) in collisions if not separate(a, b)}
+            # separate with a few iterations for stability
+            for _ in range(12):   # vähän enemmän iteraatioita
+                new_collisions = set()
+
+                for (a, b) in collisions:
+                    still_colliding = not separate(a, b)
+
+                    if still_colliding:
+                        force_unstick(a, b)   # <-- tämä estää liimautumisen
+                        new_collisions.add((a, b))
+
+                collisions = new_collisions
+
                 if not collisions:
                     break
         except Exception:
@@ -513,8 +598,11 @@ while run:
                 if isinstance(enemy, BossEnemy):
                     died = enemy.take_hit(1)
                     if died:
+                        if explosion_frames:
+                            explosions.append(Explosion(explosion_frames, enemy.rect.center, fps=24))
+
                         enemies.remove(enemy)
-                        pistejarjestelma.lisaa_piste(5)  # boss-bonus
+                        pistejarjestelma.lisaa_piste(5)
                 else:
                     # Normaali vihollinen kuolee heti
                     enemies.remove(enemy)
@@ -846,6 +934,15 @@ while run:
                         paused = False
         continue  # Älä suorita muuta pelisilmukkaa kun pause päällä
     # Päivitä näyttö
+
+    # bossin explosion
+    for ex in list(explosions):
+        ex.update(dt)
+        if ex.dead:
+            explosions.remove(ex)
+
+    for ex in explosions:
+        ex.draw(screen, camera_x, camera_y)
     pygame.display.update()
     
 
