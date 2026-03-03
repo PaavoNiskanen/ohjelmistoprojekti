@@ -17,6 +17,7 @@ sys.path.append(os.path.dirname(__file__))
 from Player import Player
 from player2 import Player2
 from Valikot.MainMenu import MainMenu
+from Valikot.NextLevel import NextLevel
 from Valikot.gameOver import GameOverScreen
 from SpriteSettings import SpriteSettings
 from itertools import product
@@ -142,6 +143,7 @@ collisions = set()
 # Wave system
 enemies = []
 current_wave = 1
+MAX_WAVE = 4
 wave_cleared = False
 
 # pelin reset
@@ -588,9 +590,32 @@ while run:
                 break  # Siirry seuraavaan ammukseen
 
     # Wave progression system
-    if len(enemies) == 0 and current_wave < 4:
+    if len(enemies) == 0 and current_wave < MAX_WAVE:
         current_wave += 1
-        spawn_wave(current_wave)   
+        spawn_wave(current_wave)
+        pygame.event.clear()
+        continue
+
+    # Show next level menu only after boss wave is cleared
+    if len(enemies) == 0 and current_wave >= MAX_WAVE:
+        next_level_screen = NextLevel(
+            current_level=current_wave,
+            max_level=MAX_WAVE,
+            display_current_level=1,
+            display_next_level=2,
+        )
+        next_level_action = next_level_screen.run()
+
+        if isinstance(next_level_action, int):
+            current_wave = next_level_action
+            spawn_wave(current_wave)
+            pygame.event.clear()
+        elif next_level_action == "settings":
+            pass
+        elif next_level_action in ("quit", "game_completed"):
+            run = False
+
+        continue
 
     # Tarkista osumat vihollisten ja pelaajan välillä
     if enemy_hit_cooldown <= 0:
