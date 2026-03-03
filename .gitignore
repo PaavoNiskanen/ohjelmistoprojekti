@@ -11,4 +11,5 @@ PLAYER_LUOKAT/PlayerInput.py
 __pycache__/
 *.py[cod]
 .venv/
+venv/
 
