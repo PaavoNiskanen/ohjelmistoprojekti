@@ -9,7 +9,7 @@ import math
 import random
 import pygame
 from typing import Optional
-from enemy import Enemy
+from Enemies.enemy import Enemy
 
 
 class StraightEnemy(Enemy):

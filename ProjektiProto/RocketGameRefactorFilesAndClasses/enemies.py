@@ -16,7 +16,7 @@ def spawn_wave(wave_num: int, resources: dict, world_rect) -> List[object]:
 
     # Yritä luoda vihollisia vain jos `enemy`-moduuli on saatavilla
     try:
-        from enemy import StraightEnemy, CircleEnemy
+        from Enemies.enemy import StraightEnemy, CircleEnemy
     except Exception:
         # Palautetaan tyhjä lista; siirrettävä myöhemmin osaksi isompaa pipelinea
         return enemies
