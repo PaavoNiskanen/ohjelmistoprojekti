@@ -5,6 +5,11 @@ from PLAYER_LUOKAT.PlayerAnimation import PlayerAnimation
 from PLAYER_LUOKAT.PlayerWeapons import PlayerWeapons
 from PLAYER_LUOKAT.PlayerInput import PlayerInput
 
+# Collision sizing defaults for player sprite.
+# Change these to tune player's collision circle relative to the sprite.
+PLAYER_DEFAULT_COLLISION_FACTOR = 0.5  # fraction of max(width,height)
+PLAYER_MIN_COLLISION_RADIUS = 2
+
 class Player(pygame.sprite.Sprite):
     def __init__(self, scale_factor, frames, x, y, boost_frames=None):
         super().__init__()
@@ -24,6 +29,11 @@ class Player(pygame.sprite.Sprite):
         self.image = self.animaatio[self.current_anim][self.frame_index]
         self.rect = self.image.get_rect(center=(x, y))
         self.pos = pygame.math.Vector2(x, y)
+        # Default collision radius for the player (can be overridden externally)
+        try:
+            self.collision_radius = max(PLAYER_MIN_COLLISION_RADIUS, int(max(self.rect.width, self.rect.height) * PLAYER_DEFAULT_COLLISION_FACTOR))
+        except Exception:
+            self.collision_radius = PLAYER_MIN_COLLISION_RADIUS
         self.vel = pygame.math.Vector2(0, 0)
         self.angle = 0.0
         self.turn_speed = 180.0

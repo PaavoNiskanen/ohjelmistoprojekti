@@ -6,6 +6,14 @@ import pygame
 import math
 import random
 
+# Collision configuration:
+# `DEFAULT_COLLISION_RADIUS_FACTOR` is multiplied by the sprite's max dimension
+# (width/height) to get a sane default collision radius. Adjust to tune how
+# large the circular collision area is relative to the visible sprite.
+# `MIN_COLLISION_RADIUS` enforces a sensible lower bound in pixels.
+DEFAULT_COLLISION_RADIUS_FACTOR = 0.45
+MIN_COLLISION_RADIUS = 8
+
 class Enemy(pygame.sprite.Sprite):
     """Perusvihollinen: tarjoaa sijainnin, törmäys‑animaation ja näytön rotaation.
 
@@ -16,6 +24,12 @@ class Enemy(pygame.sprite.Sprite):
         super().__init__()
         self.image = image
         self.rect = self.image.get_rect(center=(int(x), int(y)))
+        # Default collision radius derived from sprite size. Can be overridden
+        # externally (e.g. spawn logic) by setting `entity.collision_radius`.
+        try:
+            self.collision_radius = max(MIN_COLLISION_RADIUS, int(max(self.rect.width, self.rect.height) * DEFAULT_COLLISION_RADIUS_FACTOR))
+        except Exception:
+            self.collision_radius = MIN_COLLISION_RADIUS
         # Törmäys-tärähdyslukko: jos True, entiteetti pysyy paikallaan asetetun ajan
         self.collision_bounce_locked = False
         self.collision_bounce_timer = 0.0

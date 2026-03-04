@@ -59,6 +59,32 @@ HEALTH_ICON_POS = (X - HEALTH_ICON_SCALE_SIZE[0] - HEALTH_ICON_MARGIN, HEALTH_IC
 
 screen = pygame.display.set_mode((X,Y))
 
+# Hitbox override: set to (W, H) to force rectangle size, or None to use sprite size
+# Example: HITBOX_SIZE = (48, 48)
+HITBOX_SIZE = (48,48)
+
+
+def apply_hitbox(obj):
+    """Apply `HITBOX_SIZE` to object's rect while preserving center.
+    Also syncs `pos` attribute and updates collision_radius when possible.
+    If `HITBOX_SIZE` is None this is a no-op.
+    """
+    if HITBOX_SIZE is None:
+        return
+    try:
+        c = obj.rect.center
+        w, h = int(HITBOX_SIZE[0]), int(HITBOX_SIZE[1])
+        obj.rect.size = (w, h)
+        obj.rect.center = c
+        if hasattr(obj, 'pos'):
+            obj.pos = pygame.Vector2(obj.rect.center)
+        try:
+            obj.collision_radius = max(8, int(max(obj.rect.width, obj.rect.height) * 0.45))
+        except Exception:
+            pass
+    except Exception:
+        pass
+
 # load, convert and scale background to window size
 tausta = pygame.image.load(os.path.join(os.path.dirname(__file__),'images','taustat','avaruus.png')).convert()
 tausta = pygame.transform.scale(tausta, (X, Y))
@@ -120,9 +146,13 @@ except Exception:
 
 # Collision and UI helpers moved to modules for modularity
 USE_SPATIAL_COLLISIONS = True
-from collisions import SpatialHash, apply_impact, separate, _get_pos
+from collisions import SpatialHash, apply_impact, separate, _get_pos, get_collision_radius
 from ui import init_enemy_health_bars
 import planets
+
+# Debug toggle: draw collision rects and collision radii on screen.
+# Set to False to disable visual debug overlays.
+DEBUG_DRAW_COLLISIONS = True
 
 # Instantiate spatial hash and collision state
 spatial_hash = SpatialHash()
@@ -233,13 +263,24 @@ def spawn_wave(wave_num):
         e1.exhaust_turbo = exhaust_turbo
         e1.exhaust_normal = exhaust_normal
         e1.shots = shot_frames
+        # explicit collision radius (use sprite size, not any orbital `radius` field)
+        try:
+            e1.collision_radius = max(8, int(max(e1.rect.width, e1.rect.height) * 0.45))
+        except Exception:
+            e1.collision_radius = 16
         enemies.append(e1)
+        apply_hitbox(e1)
 
         e2 = CircleEnemy(img1, tausta_leveys // 2 + 300, tausta_korkeus // 2, radius=180, angular_speed=2.2)
         e2.exhaust_turbo = exhaust_turbo
         e2.exhaust_normal = exhaust_normal
         e2.shots = shot_frames
+        try:
+            e2.collision_radius = max(8, int(max(e2.rect.width, e2.rect.height) * 0.45))
+        except Exception:
+            e2.collision_radius = 16
         enemies.append(e2)
+        apply_hitbox(e2)
     
     elif wave_num == 2:
         edges = ["right", "top", "left"]
@@ -254,7 +295,14 @@ def spawn_wave(wave_num):
                     v = pygame.Vector2(1, 0)
                 e.vel = v.normalize() * 220
 
+            try:
+                e.collision_radius = max(8, int(max(e.rect.width, e.rect.height) * 0.45))
+            except Exception:
+                e.collision_radius = 16
             enemies.append(e)
+            apply_hitbox(e)
+            apply_hitbox(e)
+            apply_hitbox(e)
     
     elif wave_num == 3:
         # Wave 3: 5 enemies - 3 moving from top to bottom, 2 moving from bottom to top
@@ -264,13 +312,23 @@ def spawn_wave(wave_num):
         for i in range(3):
             x = spacing * (i + 1)
             y = 30
-            enemies.append(DownEnemy(enemy_imgs[i % len(enemy_imgs)], x, y, speed=250))
+            e = DownEnemy(enemy_imgs[i % len(enemy_imgs)], x, y, speed=250)
+            try:
+                e.collision_radius = max(8, int(max(e.rect.width, e.rect.height) * 0.45))
+            except Exception:
+                e.collision_radius = 16
+            enemies.append(e)
         
         # 2 enemies moving up
         for i in range(2):
             x = spacing * (i + 3.5)
             y = tausta_korkeus - 30
-            enemies.append(UpEnemy(enemy_imgs[(i + 3) % len(enemy_imgs)], x, y, speed=250))
+            e = UpEnemy(enemy_imgs[(i + 3) % len(enemy_imgs)], x, y, speed=250)
+            try:
+                e.collision_radius = max(8, int(max(e.rect.width, e.rect.height) * 0.45))
+            except Exception:
+                e.collision_radius = 16
+            enemies.append(e)
     
     elif wave_num == 4:
         # Wave 4: Boss enemy
@@ -281,7 +339,12 @@ def spawn_wave(wave_num):
             enter_speed=280,
             move_speed=320
         )
+        try:
+            boss.collision_radius = max(8, int(max(boss.rect.width, boss.rect.height) * 0.45))
+        except Exception:
+            boss.collision_radius = 64
         enemies.append(boss)
+        apply_hitbox(boss)
 
 # Spawn the first wave
 enemy_bullets = []
@@ -390,6 +453,7 @@ player_scale_factor = 1  # Skaalaa pelaajan sprite.
 # Käytä uutta `Player2`-luokkaa joka lataa spritet dynaamisesti
 try:
     player = Player2(player_ship, player_scale_factor, player_start_x, player_start_y, max_health=5)
+    apply_hitbox(player)
 except Exception as e:
     # Tulostetaan poikkeus syyksi, jotta tiedetään miksi Player2 epäonnistui
     import traceback
@@ -400,6 +464,7 @@ except Exception as e:
     frames = []
     boost_frames = []
     player = Player(player_scale_factor, frames, player_start_x, player_start_y, boost_frames=boost_frames, max_health=5)
+    apply_hitbox(player)
 
 # Debug: kerrotaan käytössä oleva pelaajaluokka ja skaala-arvot
 try:
@@ -516,8 +581,8 @@ while run:
                     # compute simple circle overlap test
                     pa = _get_pos(a)
                     pb = _get_pos(b)
-                    minsep = (getattr(a, 'radius', max(a.rect.width, a.rect.height) * 0.5) +
-                             getattr(b, 'radius', max(b.rect.width, b.rect.height) * 0.5))
+                    minsep = (get_collision_radius(a) +
+                             get_collision_radius(b))
                     if pa.distance_squared_to(pb) < (minsep * minsep):
                         # canonical pair ordering
                         pair = (a, b) if id(a) < id(b) else (b, a)
@@ -611,11 +676,11 @@ while run:
                 normal = diff.normalize()
                 # Compute desired separation to place ships at touching radii
                 try:
-                    p_radius = max(player.rect.width, player.rect.height) * 0.5
+                    p_radius = get_collision_radius(player)
                 except Exception:
                     p_radius = max(player.rect.width, player.rect.height) * 0.5
                 try:
-                    e_radius = max(enemy.rect.width, enemy.rect.height) * 0.5
+                    e_radius = get_collision_radius(enemy)
                 except Exception:
                     e_radius = max(enemy.rect.width, enemy.rect.height) * 0.5
 
@@ -734,6 +799,16 @@ while run:
                     except Exception:
                         pass
 
+                # Debug: print collision sizing information when player takes damage
+                try:
+                    collision_dist = float(dist)
+                except Exception:
+                    collision_dist = float(pygame.Vector2(player.rect.center).distance_to(pygame.Vector2(enemy.rect.center)))
+                try:
+                    print(f"PLAYER DAMAGE: RadiusPlayer={p_radius:.1f} RadiusEnemy={e_radius:.1f} CollisionDistance={collision_dist:.1f} player.rect={player.rect} enemy.rect={enemy.rect}")
+                except Exception:
+                    pass
+
                 # Deduct life (prefer player's health) and start cooldown
                 try:
                     if hasattr(player, 'health'):
@@ -776,6 +851,30 @@ while run:
 
     for e in enemies:
         e.draw(screen, camera_x, camera_y)
+
+    # Debug: draw collision rectangles and collision radii (camera-relative)
+    if DEBUG_DRAW_COLLISIONS:
+        try:
+            # player rect (red)
+            pygame.draw.rect(screen, (255, 0, 0), player.rect.move(-camera_x, -camera_y), 1)
+        except Exception:
+            pass
+        for e in enemies:
+            try:
+                # enemy rect (green)
+                pygame.draw.rect(screen, (0, 200, 0), e.rect.move(-camera_x, -camera_y), 1)
+            except Exception:
+                pass
+            try:
+                # draw collision radii as circles (semi-transparent outlines)
+                pr = int(get_collision_radius(player))
+                er = int(get_collision_radius(e))
+                pc = (int(player.rect.centerx - camera_x), int(player.rect.centery - camera_y))
+                ec = (int(e.rect.centerx - camera_x), int(e.rect.centery - camera_y))
+                pygame.draw.circle(screen, (255, 100, 100), pc, max(1, pr), 1)
+                pygame.draw.circle(screen, (100, 255, 100), ec, max(1, er), 1)
+            except Exception:
+                pass
 
     # Muzzle (paikka mistä ammus lähtee vihollisesta)
     for m in list(muzzles):

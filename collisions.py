@@ -78,6 +78,32 @@ def _set_vel(entity, v):
             pass
 
 
+def get_collision_radius(entity):
+    """Return an explicit collision radius if present, otherwise fall back to
+    legacy `radius` attribute or half the max rect dimension.
+
+    This prevents accidental use of unrelated `radius` fields (e.g. orbit
+    radius on CircleEnemy) as collision radii.
+    """
+    try:
+        # Prefer explicit collision_radius when available
+        r = getattr(entity, 'collision_radius', None)
+        if r is not None:
+            return float(r)
+    except Exception:
+        pass
+    try:
+        r = getattr(entity, 'radius', None)
+        if r is not None:
+            return float(r)
+    except Exception:
+        pass
+    try:
+        return max(entity.rect.width, entity.rect.height) * 0.5
+    except Exception:
+        return 0.5
+
+
 def apply_impact(a, b, elasticity=0.8):
     pa = _get_pos(a)
     pb = _get_pos(b)
@@ -111,8 +137,8 @@ def separate(a, b, frac=0.66):
     pb = _get_pos(b)
     ab = pa - pb
     sep = ab.length()
-    minsep = (getattr(a, 'radius', max(a.rect.width, a.rect.height) * 0.5) +
-             getattr(b, 'radius', max(b.rect.width, b.rect.height) * 0.5))
+    minsep = (get_collision_radius(a) +
+             get_collision_radius(b))
     overlap = minsep - sep
     if overlap <= 0:
         return True

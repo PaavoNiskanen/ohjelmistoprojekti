@@ -4,6 +4,11 @@ import math
 from PLAYER_LUOKAT.PlayerInput import PlayerInput
 from PLAYER_LUOKAT.PlayerWeapons import PlayerWeapons
 
+# Collision sizing defaults for player sprite.
+# Tweak these to change how big the player's circular collision area is.
+PLAYER2_DEFAULT_COLLISION_FACTOR = 0.2
+PLAYER2_MIN_COLLISION_RADIUS = 8
+
 
 class Player2(pygame.sprite.Sprite):
     """Pelaajaluokka, joka lataa spritet dynaamisesti aluksen nimen perusteella.
@@ -215,6 +220,12 @@ class Player2(pygame.sprite.Sprite):
         self.pos = pygame.math.Vector2(x, y)
         self.vel = pygame.math.Vector2(0, 0)
         self.angle = 0.0
+
+        # Default collision radius (can be adjusted externally)
+        try:
+            self.collision_radius = max(PLAYER2_MIN_COLLISION_RADIUS, int(max(self.rect.width, self.rect.height) * PLAYER2_DEFAULT_COLLISION_FACTOR))
+        except Exception:
+            self.collision_radius = PLAYER2_MIN_COLLISION_RADIUS
 
         # animaatioajastimet
         self.anim_timer = 0
