@@ -1,4 +1,4 @@
-"""Taso 2 wave-rakenne RocketGame.Game:lle.
+"""Taso 4 wave-rakenne RocketGame.Game:lle.
 
 Sisältää wave 1-4 vihollisaallot ja boss-wave (wave 4).
 Voit muokata tätä omilta enemy-kombinaatioilta.
@@ -7,7 +7,7 @@ Voit muokata tätä omilta enemy-kombinaatioilta.
 import pygame
 import random
 
-def spawn_wave_taso2(
+def spawn_wave_taso4(
 	game,
 	wave_num,
 	apply_hitbox,
@@ -19,9 +19,9 @@ def spawn_wave_taso2(
 	down_enemy_cls,
 	up_enemy_cls,
 ):
-	"""Spawn Level 2 enemies for the requested wave.
+	"""Spawn Level 4 enemies for the requested wave.
 
 	Returns:
 		bool: True if wave was handled by this level module, else False.
 	"""
-	# TODO: Implement Level 2 unique enemy compositions
+	# TODO: Implement Level 4 unique enemy compositions

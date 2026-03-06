@@ -23,6 +23,23 @@ from collisions import SpatialHash, apply_impact, separate, _get_pos, get_collis
 from ui import init_enemy_health_bars, draw_hud
 import planets
 from Tasot.Taso1 import spawn_wave_taso1
+# Import other level wave-spawn functions as they're created
+try:
+    from Tasot.Taso2 import spawn_wave_taso2
+except ImportError:
+    spawn_wave_taso2 = None
+try:
+    from Tasot.Taso3 import spawn_wave_taso3
+except ImportError:
+    spawn_wave_taso3 = None
+try:
+    from Tasot.Taso4 import spawn_wave_taso4
+except ImportError:
+    spawn_wave_taso4 = None
+try:
+    from Tasot.Taso5 import spawn_wave_taso5
+except ImportError:
+    spawn_wave_taso5 = None
 
 from GameStateManager import GameStateManager
 # Näytön koko
@@ -60,8 +77,9 @@ def apply_hitbox(obj, size=None):
 class Game:
     """Modulaarinen RocketGame-luokka, ohjattavissa PlayState kautta"""
 
-    def __init__(self, screen):
+    def __init__(self, screen, level_number=1):
         self.screen = screen
+        self.level_number = level_number  # Track which level this instance manages (1-5)
         self.dt = 0
         self.camera_x = 0
         self.camera_y = 0
@@ -75,7 +93,7 @@ class Game:
         self.muzzles = []
         self.boss = None
         self.current_wave = 1
-        self.MAX_WAVE = 4
+        self.MAX_WAVE = 4  # Each level has up to 4 waves (1-3 normal, 4 = boss)
         self.wave_cleared = False
         self.boss_clear_menu_delay_remaining = None
         self.level_completed = False
@@ -197,24 +215,40 @@ class Game:
         pygame.event.clear()
 
     def spawn_wave(self, wave_num):
-        """Spawnaa viholliset wave-numeroon perustuen"""
+        """Spawnaa viholliset wave-numeroon ja level-numeroon perustuen"""
         self.enemies.clear()
-        handled = spawn_wave_taso1(
-            game=self,
-            wave_num=wave_num,
-            apply_hitbox=apply_hitbox,
-            hitbox_enemy=HITBOX_SIZE_ENEMY,
-            hitbox_boss=HITBOX_SIZE_BOSS,
-            straight_enemy_cls=StraightEnemy,
-            circle_enemy_cls=CircleEnemy,
-            boss_enemy_cls=BossEnemy,
-            down_enemy_cls=DownEnemy,
-            up_enemy_cls=UpEnemy,
-        )
-        if handled:
-            return
 
-        # Muut wavet voidaan lisätä samalla logiikalla
+        # Dispatch to correct level's spawn function
+        spawn_func = None
+        if self.level_number == 1:
+            spawn_func = spawn_wave_taso1
+        elif self.level_number == 2 and spawn_wave_taso2:
+            spawn_func = spawn_wave_taso2
+        elif self.level_number == 3 and spawn_wave_taso3:
+            spawn_func = spawn_wave_taso3
+        elif self.level_number == 4 and spawn_wave_taso4:
+            spawn_func = spawn_wave_taso4
+        elif self.level_number == 5 and spawn_wave_taso5:
+            spawn_func = spawn_wave_taso5
+
+        if spawn_func:
+            handled = spawn_func(
+                game=self,
+                wave_num=wave_num,
+                apply_hitbox=apply_hitbox,
+                hitbox_enemy=HITBOX_SIZE_ENEMY,
+                hitbox_boss=HITBOX_SIZE_BOSS,
+                straight_enemy_cls=StraightEnemy,
+                circle_enemy_cls=CircleEnemy,
+                boss_enemy_cls=BossEnemy,
+                down_enemy_cls=DownEnemy,
+                up_enemy_cls=UpEnemy,
+            )
+            if handled:
+                return
+
+        # Fallback: if no level handler or unhandled wave, spawn nothing
+        # (Level 2-5 will use their own spawn logic when implemented)
 
     def update(self, events):
         """Päivitä pelilogiikka: pelaaja, viholliset, ammukset, collisionit jne."""
