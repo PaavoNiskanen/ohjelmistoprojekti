@@ -8,8 +8,12 @@ class PlayState(GameState):
 
     def update(self, events):
         self.game.update(events)
-        if not self.game.running:
-            self.manager.running = False
+
+        player_hp = int(getattr(self.game.player, 'health', 0)) if self.game.player is not None else 0
+        if player_hp <= 0 or not self.game.running:
+            from States.GameOverState import GameOverState
+            self.manager.set_state(GameOverState(self.manager))
+            return
 
     def draw(self, screen):
         self.game.draw(screen)

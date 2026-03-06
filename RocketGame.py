@@ -20,7 +20,7 @@ from Valikot.gameOver import GameOverScreen
 from SpriteSettings import SpriteSettings
 from explosion import ExplosionManager
 from collisions import SpatialHash, apply_impact, separate, _get_pos, get_collision_radius
-from ui import init_enemy_health_bars
+from ui import init_enemy_health_bars, draw_hud
 import planets
 
 from GameStateManager import GameStateManager
@@ -99,6 +99,7 @@ class Game:
     def _load_assets(self):
         """Lataa tausta, vihollisten kuvat ja planeetat"""
         base_path = os.path.dirname(__file__)
+        self.base_path = base_path
         self.tausta = pygame.image.load(os.path.join(base_path,'images','taustat','avaruus.png')).convert()
         self.tausta = pygame.transform.scale(self.tausta, (X, Y))
         self.tausta_leveys, self.tausta_korkeus = self.tausta.get_width(), self.tausta.get_height()
@@ -135,6 +136,28 @@ class Game:
             for _ in range(len(self.planeetat))
         ]
 
+        # Pelaajan health HUD kuvat: images/elementit/15.png .. 20.png
+        self.health_imgs = {}
+        health_dir = os.path.join(base_path, 'images', 'elementit')
+        for h in range(0, 6):
+            img_index = 15 + h
+            path = os.path.join(health_dir, f"{img_index}.png")
+            try:
+                img = pygame.image.load(path).convert_alpha()
+                img = pygame.transform.scale(img, HEALTH_ICON_SCALE_SIZE)
+                self.health_imgs[h] = img
+            except Exception:
+                self.health_imgs[h] = None
+
+        # Initialize boss/enemy health bar images used by BossEnemy.
+        try:
+            init_enemy_health_bars(base_path)
+        except Exception:
+            try:
+                init_enemy_health_bars()
+            except Exception:
+                pass
+
     def init_game_objects(self):
         """Alusta pelaaja, pistejärjestelmä ja ensimmäinen wave"""
         self.pistejarjestelma = Points()
@@ -150,6 +173,7 @@ class Game:
             self.player = Player(player_scale_factor, [], player_start_x, player_start_y, boost_frames=[], max_health=5)
 
         apply_hitbox(self.player, HITBOX_SIZE_PLAYER)
+        self.lives = int(getattr(self.player, 'health', getattr(self.player, 'max_health', 5)))
         self.spawn_wave(self.current_wave)
 
     def reset_game(self):
@@ -234,6 +258,31 @@ class Game:
                 self.enemy_bullets.remove(b)
                 self.player.health = max(0, self.player.health-1)
                 self.lives = self.player.health
+                try:
+                    if hasattr(self.player, 'trigger_hit_animation'):
+                        self.player.trigger_hit_animation()
+                except Exception:
+                    pass
+
+        # Kontakti-osuma vihollisen ja pelaajan välillä cooldownilla.
+        if self.enemy_hit_cooldown <= 0:
+            for enemy in self.enemies:
+                if self.player.rect.colliderect(enemy.rect):
+                    self.player.health = max(0, int(getattr(self.player, 'health', self.lives)) - 1)
+                    self.lives = self.player.health
+                    try:
+                        if hasattr(self.player, 'trigger_hit_animation'):
+                            self.player.trigger_hit_animation()
+                    except Exception:
+                        pass
+                    self.enemy_hit_cooldown = self.enemy_hit_cooldown_duration
+                    break
+
+        if self.enemy_hit_cooldown > 0:
+            self.enemy_hit_cooldown -= self.dt
+
+        if self.lives <= 0:
+            self.running = False
 
         # Räjähdykset
         self.explosion_manager.update(self.dt)
@@ -249,6 +298,10 @@ class Game:
         for e in self.enemies:
             e.draw(self.screen, self.camera_x, self.camera_y)
 
+        # Boss HP barit vasempaan yläkulmaan
+        for idx, e in enumerate([be for be in self.enemies if isinstance(be, BossEnemy)]):
+            e.draw_health_bar(self.screen, idx)
+
         for b in self.enemy_bullets:
             b.draw(self.screen, self.camera_x, self.camera_y)
 
@@ -259,6 +312,7 @@ class Game:
         self.explosion_manager.draw(self.screen, self.camera_x, self.camera_y)
 
         self.pistejarjestelma.show_score(10,10, pygame.font.SysFont('Arial',24), self.screen)
+        draw_hud(self.screen, X, Y, self.player, self.lives, self.health_imgs, HEALTH_ICON_POS)
 
 
 # Compatibility bridge for old function-style callers.
