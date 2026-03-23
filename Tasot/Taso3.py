@@ -41,19 +41,19 @@ def spawn_wave_taso3(
 	)
 
 	if wave_num == 1:
-		spawn_moving_meteor(game, speed=70)
+		spawn_moving_meteor(game, speed=95)
 		return True
 
 	if wave_num == 2:
-		spawn_moving_meteor(game, speed=80)
+		spawn_moving_meteor(game, speed=110)
 		return True
 
 	if wave_num == 3:
-		spawn_moving_meteor(game, speed=90)
+		spawn_moving_meteor(game, speed=125)
 		return True
 
 	if wave_num == 4:
-		spawn_moving_meteor(game, speed=100)
+		spawn_moving_meteor(game, speed=140)
 		return True
 
 	return False
