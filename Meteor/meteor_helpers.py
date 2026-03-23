@@ -1,14 +1,58 @@
 """Helper functions for spawning meteors in levels.
 
-Provides convenience functions to spawn meteors at specified locations
-or in patterns suitable for level design.
+Provides convenience functions to spawn moving meteors.
 """
 
+import random
 from Meteor.meteor import Meteor
 
 
+def spawn_moving_meteor(game, speed=150):
+    """Spawn a single large moving meteor at a random edge position.
+    
+    The meteor spawns at a random edge (top/bottom/left/right) and moves
+    linearly across the screen, bouncing off walls.
+    
+    Args:
+        game: The Game instance
+        speed: Movement speed in pixels per second (default 150)
+        
+    Returns:
+        The created Meteor instance
+    """
+    # Get screen bounds
+    width = game.tausta_leveys
+    height = game.tausta_korkeus
+    meteor_size = 75  # Rough radius
+    
+    # Choose a random edge to spawn from
+    edge = random.randint(0, 3)
+    
+    if edge == 0:  # Top edge
+        x = random.randint(meteor_size, width - meteor_size)
+        y = meteor_size
+    elif edge == 1:  # Bottom edge
+        x = random.randint(meteor_size, width - meteor_size)
+        y = height - meteor_size
+    elif edge == 2:  # Left edge
+        x = meteor_size
+        y = random.randint(meteor_size, height - meteor_size)
+    else:  # Right edge
+        x = width - meteor_size
+        y = random.randint(meteor_size, height - meteor_size)
+    
+    meteor = Meteor(
+        x, y,
+        image=None,
+        bounds=(width, height),
+        speed=speed
+    )
+    game.meteors.append(meteor)
+    return meteor
+
+
 def spawn_meteor(game, x, y, image=None):
-    """Spawn a single meteor in the game.
+    """Spawn a single meteor at a specific position with random direction.
     
     Args:
         game: The Game instance
@@ -19,79 +63,12 @@ def spawn_meteor(game, x, y, image=None):
     Returns:
         The created Meteor instance
     """
-    meteor = Meteor(x, y, image=image)
+    meteor = Meteor(
+        x, y,
+        image=image,
+        bounds=(game.tausta_leveys, game.tausta_korkeus),
+        speed=150
+    )
     game.meteors.append(meteor)
     return meteor
 
-
-def spawn_meteors_in_line(game, x1, y1, x2, y2, count, image=None):
-    """Spawn multiple meteors in a line pattern.
-    
-    Args:
-        game: The Game instance
-        x1, y1: Starting position
-        x2, y2: Ending position
-        count: Number of meteors to spawn
-        image: Optional pre-loaded pygame Surface for the meteors
-        
-    Returns:
-        List of created Meteor instances
-    """
-    meteors = []
-    for i in range(count):
-        t = i / max(1, count - 1)
-        x = x1 + (x2 - x1) * t
-        y = y1 + (y2 - y1) * t
-        meteor = spawn_meteor(game, x, y, image=image)
-        meteors.append(meteor)
-    return meteors
-
-
-def spawn_meteors_grid(game, start_x, start_y, spacing, cols, rows, image=None):
-    """Spawn meteors in a grid pattern.
-    
-    Args:
-        game: The Game instance
-        start_x: Starting X position
-        start_y: Starting Y position
-        spacing: Distance between meteors in pixels
-        cols: Number of columns
-        rows: Number of rows
-        image: Optional pre-loaded pygame Surface for the meteors
-        
-    Returns:
-        List of created Meteor instances
-    """
-    meteors = []
-    for r in range(rows):
-        for c in range(cols):
-            x = start_x + c * spacing
-            y = start_y + r * spacing
-            meteor = spawn_meteor(game, x, y, image=image)
-            meteors.append(meteor)
-    return meteors
-
-
-def spawn_meteors_circle(game, center_x, center_y, radius, count, image=None):
-    """Spawn meteors in a circular pattern.
-    
-    Args:
-        game: The Game instance
-        center_x: Circle center X
-        center_y: Circle center Y
-        radius: Radius of the circle in pixels
-        count: Number of meteors to spawn around the circle
-        image: Optional pre-loaded pygame Surface for the meteors
-        
-    Returns:
-        List of created Meteor instances
-    """
-    import math
-    meteors = []
-    for i in range(count):
-        angle = (i / count) * 2 * math.pi
-        x = center_x + radius * math.cos(angle)
-        y = center_y + radius * math.sin(angle)
-        meteor = spawn_meteor(game, x, y, image=image)
-        meteors.append(meteor)
-    return meteors

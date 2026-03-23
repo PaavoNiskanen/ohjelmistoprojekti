@@ -312,6 +312,10 @@ class Game:
             else:
                 e.maybe_shoot(self.dt, {'bullets': self.enemy_bullets, 'muzzles': self.muzzles})
 
+        # Päivitä meteorit
+        for meteor in self.meteors:
+            meteor.update(self.dt)
+
         # Ammukset
         for bullet in list(self.player.weapons.bullets):
             for enemy in list(self.enemies):
