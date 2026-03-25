@@ -115,9 +115,8 @@ class MainMenu:
             ),
         ]
 
-<<<<<<< HEAD
         self.text_input = TextInput(50, SCREEN_HEIGHT - 100, 300, 40)
-=======
+        
         # Menu backdrop: draw scene-like background and translucent veil
         # instead of a flat solid color.
         self.background_image = None
@@ -128,7 +127,6 @@ class MainMenu:
             self.background_image = pygame.transform.scale(bg, (SCREEN_WIDTH, SCREEN_HEIGHT))
         except Exception:
             self.background_image = None
->>>>>>> 900f65ab733880babcfc414576c063e9168334fe
 
     def handle_events(self, events):
         """Handle a frame's events and return selected action or None."""
