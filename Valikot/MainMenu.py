@@ -26,7 +26,7 @@ class TextInput:
         pygame.draw.rect(surface, self.color, self.rect, border_radius=5)
         pygame.draw.rect(surface, BLACK, self.rect, 2, border_radius=5)
 
-        text_surface = small_font.render(self.text, True, self.text_color)
+        text_surface = pygame.font.Font(None, 36).render(self.text, True, self.text_color)
         text_rect = text_surface.get_rect(midleft=(self.rect.x + 10, self.rect.centery))
         surface.blit(text_surface, text_rect)
 
@@ -126,7 +126,7 @@ class MainMenu:
             ),
         ]
 
-        self.text_input = TextInput(50, SCREEN_HEIGHT - 100, 300, 40)
+        self.text_input = TextInput(50, 100, 300, 40)
         
         # Menu backdrop: draw scene-like background and translucent veil
         # instead of a flat solid color.
