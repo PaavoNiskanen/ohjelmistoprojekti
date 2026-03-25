@@ -163,7 +163,7 @@ class Game:
             'fixed_dt': 0.0,
             'frame_ms': 0.0,
         }
-        self.show_physics_stats = True
+        self.show_physics_stats = False #fysiikka-debug tiedot
         self.physics_font = pygame.font.SysFont('Consolas', 16)
         self.enemy_debug_font = pygame.font.SysFont('Consolas', 14)
         self.user_physics_settings = load_physics_settings()
@@ -1173,7 +1173,7 @@ class Game:
                         direction = direction.normalize()
 
                 # Smooth knockback pelaajalle
-                    self._apply_player_knockback(direction, 320)
+                    self._apply_player_knockback(direction, 1000)
 
                 # Lukitse ohjaus hetkeksi, jotta knockback ehtii näkyä
                     if hasattr(self.player, "collision_bounce_locked"):
@@ -1315,7 +1315,12 @@ class Game:
         self.player.draw(self.screen, self.camera_x, self.camera_y)
         self.explosion_manager.draw(self.screen, self.camera_x, self.camera_y)
 
-        self.pistejarjestelma.show_score(10,10, pygame.font.SysFont('Arial',24), self.screen)
+        # Pisteet sijainti 
+        font = pygame.font.SysFont('Arial', 36)
+        text = "Pisteet: " + str(self.pistejarjestelma.hae_pisteet())
+        w, _ = font.size(text)
+        x = self.screen.get_width() - w - 10
+        self.pistejarjestelma.show_score(x, 50, font, self.screen)
         draw_hud(
             self.screen,
             self.view_width,
