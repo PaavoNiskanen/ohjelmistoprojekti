@@ -6,8 +6,7 @@ from Valikot.menu_style import (
     draw_menu_panel,
 )
 
-SCREEN_WIDTH = 1600
-SCREEN_HEIGHT = 800
+
 
 BLACK = (0, 0, 0)
 WHITE = (255, 255, 255)
@@ -23,56 +22,66 @@ class MainMenu:
         if not pygame.font.get_init():
             pygame.font.init()
 
-        button_width = 340
-        button_height = 78
-        button_spacing = 22
-        panel_width = 760
-        panel_height = 560
-        panel_left = SCREEN_WIDTH // 2 - panel_width // 2
-        panel_top = SCREEN_HEIGHT // 2 - panel_height // 2
-        self.panel_rect = pygame.Rect(panel_left, panel_top, panel_width, panel_height)
-        button_width = 300
-        button_height = 78
-        total_height = 3 * button_height + 2 * button_spacing
+        self.button_width = 300
+        self.button_height = 78
+        self.button_spacing = 22
+        self.panel_width = 760
+        self.panel_height = 560
+        self.buttons = []
+        self.panel_rect = None
+        self.background_image = None
+        self._update_layout()
+
+    def _update_layout(self):
+        # Hae nykyinen ikkunan koko
+        screen = pygame.display.get_surface()
+        if screen is not None:
+            width, height = screen.get_width(), screen.get_height()
+        else:
+            width, height = 1600, 800
+
+        panel_left = width // 2 - self.panel_width // 2
+        panel_top = height // 2 - self.panel_height // 2
+        self.panel_rect = pygame.Rect(panel_left, panel_top, self.panel_width, self.panel_height)
+
+        total_height = 3 * self.button_height + 2 * self.button_spacing
         start_y = self.panel_rect.top + 170 + (self.panel_rect.height - 240 - total_height) // 2
-        center_x = SCREEN_WIDTH // 2 - button_width // 2
+        center_x = width // 2 - self.button_width // 2
 
         self.buttons = [
             MenuButton(
                 center_x,
                 start_y,
-                button_width,
-                button_height,
+                self.button_width,
+                self.button_height,
                 "START GAME",
                 action="start",
             ),
             MenuButton(
                 center_x,
-                start_y + button_height + button_spacing,
-                button_width,
-                button_height,
+                start_y + self.button_height + self.button_spacing,
+                self.button_width,
+                self.button_height,
                 "SETTINGS",
                 action="settings",
             ),
             MenuButton(
                 center_x,
-                start_y + 2 * (button_height + button_spacing),
-                button_width,
-                button_height,
+                start_y + 2 * (self.button_height + self.button_spacing),
+                self.button_width,
+                self.button_height,
                 "QUIT",
                 action="quit",
                 variant="danger",
             ),
         ]
 
-        # Menu backdrop: draw scene-like background and translucent veil
-        # instead of a flat solid color.
-        self.background_image = None
+        # Päivitä taustakuva oikeaan kokoon
         try:
             project_root = os.path.dirname(os.path.dirname(__file__))
             bg_path = os.path.join(project_root, "images", "taustat", "avaruus.png")
             bg = pygame.image.load(bg_path).convert()
-            self.background_image = pygame.transform.scale(bg, (SCREEN_WIDTH, SCREEN_HEIGHT))
+            self.background_image = pygame.transform.scale(bg, (width, height))
         except Exception:
             self.background_image = None
 
@@ -87,6 +96,8 @@ class MainMenu:
         return None
 
     def draw(self, surface):
+        # Päivitä layout aina ennen piirtämistä, jos ikkunan koko on muuttunut
+        self._update_layout()
         if self.background_image is not None:
             surface.blit(self.background_image, (0, 0))
         else:
