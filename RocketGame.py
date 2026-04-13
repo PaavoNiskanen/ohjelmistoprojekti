@@ -1,6 +1,6 @@
 """
 Module: RocketGame.py
-Dependencies: pygame, os, random, SpriteSettings, PLAYER_LUOKAT.Player2 (Player2), EnemyAI (StraightEnemy, CircleEnemy), Enemies.boss_enemy (BossEnemy), Points
+Dependencies: pygame, os, random, SpriteSettings, PLAYER_LUOKAT.Player (Player), EnemyAI (StraightEnemy, CircleEnemy), Enemies.boss_enemy (BossEnemy), Points
 Provides: main game loop, loads sprites and spawns enemies/boss, handles collisions and draws
 Uses: EnemyHelpers for specific explosion spawn when needed
 """
@@ -17,7 +17,7 @@ from Enemies.EnemyAI import StraightEnemy, CircleEnemy, DownEnemy, UpEnemy, ZigZ
 from Enemies.boss_enemy import BossEnemy
 from points import Points
 sys.path.append(os.path.dirname(__file__))
-from player2 import Player2
+from PLAYER_LUOKAT.Player import Player
 from Valikot.NextLevel import NextLevel
 from Valikot.gameOver import GameOverScreen
 from leaderboard import Leaderboard, DEFAULT_LEADERBOARD_FILE
@@ -32,6 +32,7 @@ from Audio import pelimusat
 from Valikot.MainMenu import get_current_player_name, clear_current_player_name
 from Meteor.meteor import Meteor
 from Hazards.hazard_system import HazardSystem
+from itemSpawn import ItemSpawner
 from Tasot.Taso1 import spawn_wave_taso1
 # Import other level wave-spawn functions as they're created
 try:
@@ -104,6 +105,7 @@ class Game:
         self.is_test_level = int(level_number) == 0
         self.is_test2_level = int(level_number) == 6
         self.dt = 0
+        self.game_time = 0.0  # Cumulative game time (seconds)
         self.camera_x = 0
         self.camera_y = 0
         self.running = True
@@ -147,6 +149,10 @@ class Game:
             self.leaderboard.load_from_file(DEFAULT_LEADERBOARD_FILE)
         except FileNotFoundError:
             pass
+
+        # Enemy speed debuff tracking
+        self.enemy_speed_debuff_time = 0.0  # Seconds remaining
+        self.player_speed_boost_time = 0.0  # Seconds remaining
 
         # Pygame-resurssit
         self.clock = pygame.time.Clock()
@@ -251,6 +257,15 @@ class Game:
                 },
             )
             self.meteors = self.hazard_system.meteors
+
+        # Alusta ItemSpawner item-droppaukselle
+        self.item_spawner = ItemSpawner(config={
+            "enemy_drop_chance": 0.70,  # 70% droprate!
+            "boss_drop_interval_min": 3.0,
+            "boss_drop_interval_max": 5.0,
+        })
+        # Optimize sprites now that display is initialized
+        self.item_spawner.optimize_sprites_for_display()
 
         # Alusta pelaaja ja ensimmäinen wave
         self.init_game_objects()
@@ -395,7 +410,7 @@ class Game:
         player_start_y = self.tausta_korkeus // 2
         player_scale_factor = 1
 
-        self.player = Player2(player_ship, player_scale_factor, player_start_x, player_start_y, max_health=5)
+        self.player = Player(player_ship, player_scale_factor, player_start_x, player_start_y, max_health=5)
         if hasattr(self.player, 'destroyed_anim_speed'):
             self.player.destroyed_anim_speed = PLAYER_DESTROYED_FRAME_MS
 
@@ -894,10 +909,49 @@ class Game:
         # Fallback: if no level handler or unhandled wave, spawn nothing
         # (Level 2-5 will use their own spawn logic when implemented)
 
+    def apply_damage(self, damage_amount):
+        """
+        Apply damage to player, first reducing armor, then health.
+        
+        Args:
+            damage_amount: Amount of damage to apply (default 1)
+        """
+        if not self.player:
+            return
+        
+        armor = getattr(self.player, 'armor', 0)
+        
+        if armor > 0:
+            # Armor absorbs damage first
+            if armor >= damage_amount:
+                self.player.armor -= damage_amount
+                return  # No health damage
+            else:
+                # Armor breaks, remaining damage goes to health
+                remaining_damage = damage_amount - armor
+                self.player.armor = 0
+                self.player.health = max(0, self.player.health - remaining_damage)
+        else:
+            # No armor, direct health damage
+            self.player.health = max(0, self.player.health - damage_amount)
+        
+        self.lives = int(self.player.health)
+
     def update(self, events):
         """Päivitä pelilogiikka: pelaaja, viholliset, ammukset, collisionit jne."""
         frame_start = time.perf_counter()
         self.dt = self.clock.tick(60)
+        self.game_time += self.dt / 1000.0  # Track cumulative game time for item drops
+        
+        # Update item effect timers
+        dt_s = self.dt / 1000.0
+        if self.enemy_speed_debuff_time > 0:
+            self.enemy_speed_debuff_time -= dt_s
+        if self.player_speed_boost_time > 0:
+            self.player_speed_boost_time -= dt_s
+            # Apply speed boost to player
+            if self.player and hasattr(self.player, 'speed_boost_multiplier'):
+                self.player.speed_boost_multiplier = 1.25  # 25% faster
 
         if self._refresh_view_metrics():
             self._rescale_assets_for_view()
@@ -1007,6 +1061,9 @@ class Game:
                                 if enemy in self.enemies:
                                     if self.hazard_system is not None:
                                         self.hazard_system.on_enemy_destroyed(enemy, is_boss=False)
+                                    # Dropaa item vihollisen kuolemasta
+                                    if hasattr(self, 'item_spawner') and self.item_spawner.should_enemy_drop():
+                                        self.item_spawner.spawn_item_from_enemy(enemy.rect.center)
                                     self.enemies.remove(enemy)
                                 self.pistejarjestelma.lisaa_piste(1)
                             else:
@@ -1041,8 +1098,7 @@ class Game:
                 b.explode()
                 if getattr(b, 'dead', False) and b in self.enemy_bullets:
                     self.enemy_bullets.remove(b)
-                self.player.health = max(0, self.player.health-1)
-                self.lives = self.player.health
+                self.apply_damage(1)  # Enemy bullet damage (armor first, then health)
                 try:
                     if hasattr(self.player, 'trigger_hit_animation'):
                         self.player.trigger_hit_animation()
@@ -1055,8 +1111,7 @@ class Game:
             if meteor_hit_cooldown <= 0 and self.lives > 0 and self.player_death_menu_delay_remaining is None:
                 for meteor in self.meteors:
                     if self.player.rect.colliderect(meteor.rect):
-                        self.player.health = max(0, self.player.health - 1)
-                        self.lives = self.player.health
+                        self.apply_damage(1)  # Meteor damage (armor first, then health)
                         try:
                             if hasattr(self.player, 'trigger_hit_animation'):
                                 self.player.trigger_hit_animation()
@@ -1107,8 +1162,7 @@ class Game:
 
             damage = int(hazard_effects.get("player_damage", 0))
             if damage > 0 and self.lives > 0 and self.player_death_menu_delay_remaining is None:
-                self.player.health = max(0, int(self.player.health) - damage)
-                self.lives = self.player.health
+                self.apply_damage(damage)  # Hazard damage (armor first, then health)
                 # SOITA METEOR_HITS_PLAYER -ÄÄNI KUN PELAAJA OTTAA VAHINKOA
                 if pelimusat.game_sounds:
                     pelimusat.game_sounds.play_sfx("meteor_hits_player")
@@ -1178,8 +1232,7 @@ class Game:
         if self.enemy_hit_cooldown <= 0 and self.lives > 0 and self.player_death_menu_delay_remaining is None:
             for enemy in self.enemies:
                 if self.player.rect.colliderect(enemy.rect):
-                    self.player.health = max(0, int(getattr(self.player, 'health', self.lives)) - 1)
-                    self.lives = self.player.health
+                    self.apply_damage(1)  # Enemy contact damage (armor first, then health)
 
                     try:
                         if hasattr(self.player, 'trigger_hit_animation'):
@@ -1290,6 +1343,53 @@ class Game:
         # Räjähdykset
         self.explosion_manager.update(self.dt)
 
+        # Päivitä itemit ja käsittele keräilyt
+        if hasattr(self, 'item_spawner'):
+            collected_items = self.item_spawner.update(self.dt, self.player.rect if self.player else None)
+            # Käsittele keräillyt itemit
+            if collected_items and self.player:
+                for item_type, item_value in collected_items:
+                    if item_type == "health":
+                        # Restoraa health +2
+                        self.player.health = min(self.player.max_health, self.player.health + item_value)
+                        self.lives = int(self.player.health)
+                    elif item_type == "armor_bonus":
+                        # Lisää armor
+                        self.player.armor = min(10, self.player.armor + item_value)
+                    elif item_type == "damage_bonus":
+                        # Lisää damage bonus
+                        self.player.damage_bonus += item_value
+                    elif item_type == "enemy_speed_debuff":
+                        # Hyväksi enemy slow buff (10 sec)
+                        # Tallennetaan että se on aktiivinen
+                        if not hasattr(self, 'enemy_speed_debuff_time'):
+                            self.enemy_speed_debuff_time = 0
+                        self.enemy_speed_debuff_time = max(self.enemy_speed_debuff_time, item_value)  # 10 seconds
+                    elif item_type == "hp_bonus":
+                        # Lisää max health
+                        self.player.max_health += item_value
+                        self.player.health = min(self.player.max_health, self.player.health + item_value)
+                    elif item_type == "shield_bonus":
+                        # Shield boost
+                        if hasattr(self.player, 'armor'):
+                            self.player.armor = min(10, self.player.armor + item_value)
+                    elif item_type == "speed_boost":
+                        # Player speed boost (10 sec, +25% movement)
+                        self.player_speed_boost_time = max(self.player_speed_boost_time, item_value)
+                    elif item_type == "enemy_destroy":
+                        # NUKE: Destroy all enemies on screen
+                        for enemy in list(self.enemies):
+                            self.explosion_manager.spawn_enemy(enemy.rect.center, fps=20)
+                            try:
+                                if pelimusat.game_sounds:
+                                    pelimusat.game_sounds.play_sfx("enemy_explosion")
+                            except Exception:
+                                pass
+                            if self.hazard_system is not None:
+                                self.hazard_system.on_enemy_destroyed(enemy, is_boss=False)
+                            self.enemies.remove(enemy)
+                            self.pistejarjestelma.lisaa_piste(2)  # Bonus points for nuke kills
+
         if self.boss_clear_menu_delay_remaining is not None:
             self.boss_clear_menu_delay_remaining -= self.dt
             if self.boss_clear_menu_delay_remaining <= 0:
@@ -1336,6 +1436,10 @@ class Game:
 
         for m in self.muzzles:
             m.draw(self.screen, self.camera_x, self.camera_y)
+
+        # Piirrä itemit
+        if hasattr(self, 'item_spawner'):
+            self.item_spawner.draw(self.screen, self.camera_x, self.camera_y)
 
         self.player.draw(self.screen, self.camera_x, self.camera_y)
         self.explosion_manager.draw(self.screen, self.camera_x, self.camera_y)

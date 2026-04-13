@@ -33,6 +33,9 @@ def draw_hud(screen, X, Y, player, lives, health_imgs, HUD_POS):
     
     # Boost-mittari
     draw_boost_bar(screen, player, X, Y)
+    
+    # Armor-mittari
+    draw_armor_bar(screen, player, X, Y)
 
 
 def draw_boost_bar(screen, player, X, Y):
@@ -103,6 +106,56 @@ def draw_boost_bar(screen, player, X, Y):
         text = f"CHARGING: {boost_energy:.1f}s"
         text_color = (100, 150, 255)  # Sininen lataus
     
+    text_surf = font.render(text, True, text_color)
+    screen.blit(text_surf, (bar_x + 5, bar_y - 25))
+
+
+def draw_armor_bar(screen, player, X, Y):
+    """Piirtää armor-mittarin näytölle"""
+    if not hasattr(player, 'armor'):
+        return
+    
+    # Mittarin parametrit
+    bar_width = 200
+    bar_height = 20
+    bar_x = 20
+    bar_y = Y - 70  # Boost-mittarin alle
+    max_armor = 10
+    border_thickness = 2
+    
+    # Värit
+    color_bg = (50, 50, 50)  # Harmaa tausta
+    color_armor = (100, 150, 200)  # Sininen
+    color_border = (255, 255, 255)  # Valkoinen kehys
+    
+    armor = getattr(player, 'armor', 0)
+    
+    # Laske armor-prosentti
+    if max_armor > 0:
+        progress = min(armor / max_armor, 1.0)
+    else:
+        progress = 0.0
+    
+    # Piirrä tausta
+    pygame.draw.rect(screen, color_bg, (bar_x, bar_y, bar_width, bar_height))
+    
+    # Piirrä täyttö - punainen kun broken, sininen muutoin
+    fill_color = (100, 150, 200) if armor > 0 else (255, 0, 0)  # Punainen kun nolla
+    fill_width = int(bar_width * progress)
+    if fill_width > 0:
+        pygame.draw.rect(screen, fill_color, (bar_x, bar_y, fill_width, bar_height))
+    
+    # Piirrä kehys
+    pygame.draw.rect(screen, color_border, (bar_x, bar_y, bar_width, bar_height), border_thickness)
+    
+    # Piirrä teksti
+    font = pygame.font.SysFont('Arial', 14)
+    if armor <= 0 and max_armor > 0:
+        text = "ARMOR BROKEN!"
+        text_color = (255, 50, 50)  # Punainen varoitus
+    else:
+        text = f"ARMOR: {armor:.0f}/{max_armor}"
+        text_color = (100, 150, 200) if armor > 0 else (255, 100, 100)
     text_surf = font.render(text, True, text_color)
     screen.blit(text_surf, (bar_x + 5, bar_y - 25))
 
