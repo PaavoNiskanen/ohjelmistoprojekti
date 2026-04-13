@@ -8,6 +8,7 @@ Provides:
   - UpEnemy: Spawns at bottom, moves upward, bounces at boundaries
   - ZigZagEnemy: Moves in zigzag pattern (sine wave horizontally)
   - ChaseEnemy: Follows the player with wall avoidance
+  - UltimateEnemy: Elite enemy using Ship2 sprites with exhaust animation
 Used by: RocketGame.py
 """
 
@@ -693,6 +694,99 @@ class ChaseEnemy(Enemy):
                 self.vel = direction * self.speed
                 # Update angle to face chase direction
                 self._update_display_angle(dt_ms, math.atan2(direction.y, direction.x) - math.pi / 2)
+
+        # Update rect to follow position
+        self.rect.center = (int(self.pos.x), int(self.pos.y))
+
+
+class UltimateEnemy(Enemy):
+    """Elite enemy using Ship2 sprites with exhaust animation.
+    
+    Uses SpriteSettings to load Ship2 alus and exhaust animations.
+    Chases the player with wall avoidance and displays exhaust.
+    
+    Attributes:
+        exhaust_normal: List of exhaust animation frames
+        exhaust_turbo: List of turbo exhaust frames (optional)
+        exhaust_index: Current frame index for exhaust animation
+    """
+    def __init__(self, image, x, y, speed=250, hp=2, sprite_index: int | None = None,
+                 exhaust_normal: list | None = None, exhaust_turbo: list | None = None):
+        super().__init__(image, x, y, hp)
+        if sprite_index is not None:
+            self.set_sprite_config(sprite_index)
+        
+        self.pos = pygame.Vector2(x, y)
+        self.speed = speed
+        self.vel = pygame.Vector2(0, 0)
+        self.hit_player_cooldown = 0.0
+        
+        # Exhaust animation frames
+        self.exhaust_normal = exhaust_normal or []
+        self.exhaust_turbo = exhaust_turbo or []
+        self.exhaust_index = 0
+        self._exhaust_timer = 0
+        self.exhaust_speed_ms = 70  # Animation frame delay
+        self.turbo = False  # Can be set externally to enable turbo exhaust
+
+    def update(self, dt_ms, player=None, world_rect=None):
+        dt = dt_ms / 1000.0
+
+        # Decrease cooldown
+        if self.hit_player_cooldown > 0:
+            self.hit_player_cooldown -= dt
+
+        # Move toward player if cooldown is not active
+        if player is not None and self.hit_player_cooldown <= 0:
+            target = pygame.Vector2(player.rect.center)
+            direction = target - self.pos
+
+            if direction.length_squared() > 0:
+                direction = direction.normalize()
+                
+                # Boundary avoidance: steer away from walls
+                if world_rect is not None:
+                    avoidance_dist = 100.0
+                    turn_strength = 0.4
+                    
+                    # Check distances to walls
+                    dist_left = self.pos.x - world_rect.left
+                    dist_right = world_rect.right - self.pos.x
+                    dist_top = self.pos.y - world_rect.top
+                    dist_bottom = world_rect.bottom - self.pos.y
+                    
+                    # Create avoidance steering
+                    avoidance = pygame.Vector2(0, 0)
+                    
+                    if dist_left < avoidance_dist:
+                        avoidance.x += (1.0 - dist_left / avoidance_dist) * turn_strength
+                    if dist_right < avoidance_dist:
+                        avoidance.x -= (1.0 - dist_right / avoidance_dist) * turn_strength
+                    if dist_top < avoidance_dist:
+                        avoidance.y += (1.0 - dist_top / avoidance_dist) * turn_strength
+                    if dist_bottom < avoidance_dist:
+                        avoidance.y -= (1.0 - dist_bottom / avoidance_dist) * turn_strength
+                    
+                    # Blend chase direction with avoidance
+                    if avoidance.length_squared() > 0:
+                        direction = (direction * 0.7 + avoidance.normalize() * 0.3).normalize()
+                
+                self.pos += direction * self.speed * dt
+                self.vel = direction * self.speed
+                # Update angle to face chase direction (keula menosuuntaan)
+                self._update_display_angle(dt_ms, math.atan2(direction.y, direction.x) - math.pi / 2)
+        
+        # Update exhaust animation
+        if self.vel.length() > 5.0:
+            self._exhaust_timer += int(dt_ms)
+            if self._exhaust_timer >= self.exhaust_speed_ms:
+                self._exhaust_timer -= self.exhaust_speed_ms
+                # Cycle through exhaust frames
+                exhaust_list = self.exhaust_turbo if self.turbo and self.exhaust_turbo else self.exhaust_normal
+                if exhaust_list:
+                    self.exhaust_index = (self.exhaust_index + 1) % len(exhaust_list)
+        else:
+            self.exhaust_index = 0
 
         # Update rect to follow position
         self.rect.center = (int(self.pos.x), int(self.pos.y))
