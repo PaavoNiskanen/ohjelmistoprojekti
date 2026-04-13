@@ -1,6 +1,6 @@
 """
 Module: RocketGame.py
-Dependencies: pygame, os, random, SpriteSettings, PLAYER_LUOKAT.Player2 (Player2), EnemyAI (StraightEnemy, CircleEnemy), boss_enemy (BossEnemy), Points
+Dependencies: pygame, os, random, SpriteSettings, PLAYER_LUOKAT.Player2 (Player2), EnemyAI (StraightEnemy, CircleEnemy), Enemies.boss_enemy (BossEnemy), Points
 Provides: main game loop, loads sprites and spawns enemies/boss, handles collisions and draws
 Uses: EnemyHelpers for specific explosion spawn when needed
 """
@@ -14,13 +14,13 @@ from Enemies import enemy
 import pygame
 import random
 from Enemies.EnemyAI import StraightEnemy, CircleEnemy, DownEnemy, UpEnemy, ZigZagEnemy, ChaseEnemy
-from boss_enemy import BossEnemy
+from Enemies.boss_enemy import BossEnemy
 from points import Points
 sys.path.append(os.path.dirname(__file__))
 from player2 import Player2
 from Valikot.NextLevel import NextLevel
 from Valikot.gameOver import GameOverScreen
-from leaderboard import Leaderboard
+from leaderboard import Leaderboard, DEFAULT_LEADERBOARD_FILE
 from SpriteSettings import SpriteSettings
 from explosion import ExplosionManager
 from Collision.collisions import SpatialHash, apply_impact, separate, _get_pos, get_collision_radius
@@ -28,7 +28,7 @@ from ui import init_enemy_health_bars, draw_hud
 from Physics.box2d_world import Box2DPhysicsWorld, CollisionCategory
 from physics_settings import load_physics_settings
 import planets
-import pelimusat
+from Audio import pelimusat
 from Meteor.meteor import Meteor
 from Hazards.hazard_system import HazardSystem
 from Tasot.Taso1 import spawn_wave_taso1
@@ -143,7 +143,7 @@ class Game:
         self.pistejarjestelma = None
         self.leaderboard = Leaderboard()
         try:
-            self.leaderboard.load_from_file(os.path.join(os.path.dirname(__file__), 'leaderboard.json'))
+            self.leaderboard.load_from_file(DEFAULT_LEADERBOARD_FILE)
         except FileNotFoundError:
             pass
 
@@ -1256,7 +1256,7 @@ class Game:
                 self.text = ''
             self.leaderboard.add_score(self.text,
                                        self.pistejarjestelma.hae_pisteet())
-            self.leaderboard.save_to_file(os.path.join(self.base_path, 'leaderboard.json'))
+            self.leaderboard.save_to_file(DEFAULT_LEADERBOARD_FILE)
             try:
                 with open('player_name.txt', 'w') as file:
                     # Varmista, että tiedosto on tyhjä ennen seuraavaa peliä.
