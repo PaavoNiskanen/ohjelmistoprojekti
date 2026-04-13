@@ -1,4 +1,8 @@
 import json
+import os
+
+LEADERBOARD_DIR = os.path.join(os.path.dirname(__file__), 'SETTINGS-tiedostot')
+DEFAULT_LEADERBOARD_FILE = os.path.join(LEADERBOARD_DIR, 'leaderboard.json')
 
 class Leaderboard:
     def __init__(self):
@@ -86,6 +90,9 @@ class Leaderboard:
 
     def save_to_file(self, filename: str) -> None:
         try:
+            parent_dir = os.path.dirname(filename)
+            if parent_dir:
+                os.makedirs(parent_dir, exist_ok=True)
             with open(filename, 'w') as file:
                 json.dump(self.scores, file)
         except Exception as e:
@@ -93,14 +100,26 @@ class Leaderboard:
 
     def load_from_file(self, filename: str) -> None:
         self.scores.clear()
-        try:
-            with open(filename, 'r') as file:
-                self.scores = json.load(file)
-        except Exception as e:
-            print(f"Virhe ladattaessa tiedostosta: {e}")
-            with open(filename, 'w') as file:
-                json.dump({}, file)
-                self.scores = {}
+        legacy_filename = os.path.join(os.path.dirname(__file__), 'leaderboard.json')
+        candidate_files = [filename]
+        if os.path.normpath(filename) == os.path.normpath(DEFAULT_LEADERBOARD_FILE):
+            candidate_files.append(legacy_filename)
+
+        for candidate in candidate_files:
+            try:
+                with open(candidate, 'r') as file:
+                    self.scores = json.load(file)
+                if candidate != filename:
+                    self.save_to_file(filename)
+                return
+            except FileNotFoundError:
+                continue
+            except Exception as e:
+                print(f"Virhe ladattaessa tiedostosta: {e}")
+                break
+
+        self.scores = {}
+        self.save_to_file(filename)
 
     def merge_leaderboard(self, other_leaderboard) -> None:
         for player_id, score in other_leaderboard.get_player_scores().items():
