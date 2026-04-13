@@ -157,7 +157,7 @@ class Player2(pygame.sprite.Sprite):
 
         # Lataa liike/boost/fly/hurt/destroyed/shot-kehykset
         self.move_frames = load_frames_from('Move') or load_frames_from('Fly1') or []
-        self.boost_frames = load_frames_from('Boost') or load_frames_from('Boost_1') or []
+        self.boost_frames = load_frames_from('Boost1') or load_frames_from('Boost') or load_frames_from('Boost_1') or []
         # Fly1 (liike) voi olla erikseen nimetty
         if not self.move_frames:
             self.move_frames = load_frames_from('Fly1')
@@ -293,11 +293,43 @@ class Player2(pygame.sprite.Sprite):
         self.max_health = int(max(1, max_health))
         self.health = int(self.max_health)
 
+        # Boost-mekanismi: Shift-nappi
+        self.boost_energy = 3.0  # Boost-energia (0-3 sek) - aloita täytenä
+        self.boost_max_energy = 3.0  # Max boost
+        self.boost_drain_rate = 1.0  # Nopeus jolla energia vähenee (per sekunti)
+        self.boost_recharge_rate = 0.5  # Nopeus jolla energia palautuu (per sekunti)
+        self.boost_active = False  # Onko boost käynnissä
+        self.boost_depleted = False  # Onko boost KOSKAAN loppunut täysin (0.0)
+        self.boost_multiplier = 6  # Kiihdytyksen kerroin boostatessa (6x - 3sec -> 0.5sec)
+
         # (No debug output) initialization complete
 
 
 
 
+
+    def bind_box2d_body(self, body):
+        self.box2d_body = body
+
+    def update_boost_timers(self, dt_s):
+        """Päivitä boost-energiaa: vähennä jos nappi painettu, ladaa jos ei"""
+        # Seuraa onko boost loppunut kokonaan
+        if self.boost_energy <= 0.0:
+            self.boost_depleted = True
+        # Resetoi depleted-flag kun täysin täynnä
+        elif self.boost_energy >= self.boost_max_energy:
+            self.boost_depleted = False
+        
+        # Jos Shift painettu JA energiaa jäljellä → käytä boostia
+        if self.input.boost and self.boost_energy > 0.0:
+            self.boost_active = True
+            # Vähennä energia
+            self.boost_energy = max(0.0, self.boost_energy - self.boost_drain_rate * dt_s)
+        else:
+            self.boost_active = False
+            # Ladaa energia takaisin
+            if self.boost_energy < self.boost_max_energy:
+                self.boost_energy = min(self.boost_max_energy, self.boost_energy + self.boost_recharge_rate * dt_s)
 
     def bind_box2d_body(self, body):
         self.box2d_body = body
@@ -313,9 +345,12 @@ class Player2(pygame.sprite.Sprite):
         self.update_hit_animation(dt)
         self.handle_attack_animation(dt)
         self.handle_animation(dt)
+        
+        # Boost-timeri päivitys
+        dt_s = dt / 1000.0
+        self.update_boost_timers(dt_s)
+        
         if getattr(self, 'collision_bounce_locked', False):
-            dt_s = dt / 1000.0
-
             damping = max(0.0, float(getattr(self, 'collision_bounce_damping', 7.5)))
             if damping > 0.0:
                 decay = max(0.0, min(1.0, 1.0 - damping * dt_s))
@@ -325,6 +360,7 @@ class Player2(pygame.sprite.Sprite):
             if self.collision_bounce_timer <= 0:
                 self.collision_bounce_locked = False
                 self.collision_bounce_timer = 0
+                self.vel = pygame.Vector2(0, 0)  # STOP
 
             # liu'u knockbackin mukana
             self.pos += self.vel * dt_s
@@ -461,15 +497,26 @@ class Player2(pygame.sprite.Sprite):
                 self.image = frames[0]
             return
 
-        # choose idle vs move vs boost
+        # Choose idle vs move vs boost based on input and boost_active
         if self.input.moveUp:
-            new_anim = 'boost' if self.animaatio.get('boost') else 'move'
+            # Näytä Boost1 anim kun:
+            # 1. Boost on aktiivinen (shift painettu) JA
+            # 2. Boost energiaa jäljellä > 0
+            has_boost_frames = bool(self.animaatio.get('boost'))
+            can_show_boost_anim = self.boost_active and self.boost_energy > 0 and has_boost_frames
+            
+            if can_show_boost_anim:
+                new_anim = 'boost'
+            else:
+                new_anim = 'move'
         else:
             new_anim = 'idle'
+        
         if new_anim != self.current_anim:
             self.current_anim = new_anim
             self.frame_index = 0
             self.anim_timer = 0
+        
         frames = self.animaatio.get(self.current_anim, [])
         frame_count = len(frames)
         if frame_count:
@@ -497,25 +544,36 @@ class Player2(pygame.sprite.Sprite):
             self._apply_box2d_movement(dt_s)
             return
 
+        # Kääntyminen: 180 astetta per sekunti
         if self.input.turnLeft:
             self.angle += 180.0 * dt_s
         if self.input.turnRight:
             self.angle -= 180.0 * dt_s
+        
+        # W-nappi: kiihdytys (ja boost vaikutus)
         if self.input.moveUp:
             rad = math.radians(self.angle)
-            thrust = pygame.math.Vector2(math.cos(rad), math.sin(rad)) * 300.0 * dt_s
+            # Boost kertoimen lisääminen kiihdytykseen
+            accel_base = 300.0
+            accel = accel_base * (self.boost_multiplier if self.boost_active else 1.0)
+            thrust = pygame.math.Vector2(math.cos(rad), math.sin(rad)) * accel * dt_s
             self.vel += thrust
-            if self.vel.length() > 400.0:
-                self.vel.scale_to_length(400.0)
+            # Max speed: 400 normaali, 1000 boostissa (6x kiihdytys + kohtuullinen max)
+            max_speed = 1000.0 if self.boost_active else 400.0
+            if self.vel.length() > max_speed:
+                self.vel.scale_to_length(max_speed)
+        
+        # S-nappi: jarrutus - VAIN JOS NOPEUS > 0
         if self.input.moveDown:
             speed = self.vel.length()
-            if speed > 0:
+            if speed > 0.1:  # Threshold: pieni nopeus ei vähennä nopeutta
                 dec = 500.0 * dt_s
                 new_speed = max(0.0, speed - dec)
-                if new_speed == 0:
+                if new_speed < 0.1:  # Nollaa jos tosi pieni
                     self.vel = pygame.math.Vector2(0, 0)
                 else:
                     self.vel.scale_to_length(new_speed)
+        
         self.pos += self.vel * dt_s
         self.rect.center = (int(self.pos.x), int(self.pos.y))
 

@@ -30,6 +30,81 @@ def draw_hud(screen, X, Y, player, lives, health_imgs, HUD_POS):
     except Exception:
         lives_text = font.render(f"Elämät: {lives}", True, (255, 255, 255))
         screen.blit(lives_text, (X - 200, 10))
+    
+    # Boost-mittari
+    draw_boost_bar(screen, player, X, Y)
+
+
+def draw_boost_bar(screen, player, X, Y):
+    """Piirtää boost-mittarin näytölle (energia-pohjainen)"""
+    if not hasattr(player, 'boost_energy'):
+        return
+    
+    # Mittarin parametrit
+    bar_width = 200
+    bar_height = 20
+    bar_x = 20
+    bar_y = Y - 40
+    border_thickness = 2
+    
+    # Värit
+    color_bg = (50, 50, 50)  # Harmaa tausta
+    color_charging = (100, 150, 255)  # Sininen ladatessa
+    color_active = (255, 200, 0)  # Keltainen aktiivinen
+    color_border = (255, 255, 255)  # Valkoinen kehys
+    
+    # Hae boost-energia parametrit
+    boost_energy = getattr(player, 'boost_energy', 0.0)
+    boost_max_energy = getattr(player, 'boost_max_energy', 3.0)
+    boost_active = getattr(player, 'boost_active', False)
+    
+    # Laske energia-prosentti
+    if boost_max_energy > 0:
+        progress = boost_energy / boost_max_energy
+    else:
+        progress = 0.0
+    
+    # Valitse väri riippuen boost-tilasta
+    if boost_active:
+        fill_color = color_active  # Keltainen kun käytössä
+    else:
+        fill_color = color_charging  # Sininen kun ladataan
+    
+    # Rajoita progress 0-1 välille
+    progress = max(0.0, min(1.0, progress))
+    
+    # Piirrä tausta
+    pygame.draw.rect(screen, color_bg, (bar_x, bar_y, bar_width, bar_height))
+    
+    # Piirrä täyttö
+    fill_width = int(bar_width * progress)
+    if fill_width > 0:
+        pygame.draw.rect(screen, fill_color, (bar_x, bar_y, fill_width, bar_height))
+    
+    # Piirrä kehys
+    pygame.draw.rect(screen, color_border, (bar_x, bar_y, bar_width, bar_height), border_thickness)
+    
+    # Piirrä teksti
+    font = pygame.font.SysFont('Arial', 14)
+    boost_is_full = (abs(boost_energy - boost_max_energy) < 0.01)
+    boost_depleted = getattr(player, 'boost_depleted', False)
+    
+    if boost_active:
+        text = f"BOOST: {boost_energy:.1f}s"
+        text_color = (255, 200, 0)
+    elif boost_depleted:
+        # Boost on loppunut kokonaan - näytä latausprosentti
+        text = f"RECHARGING: {boost_energy:.1f}s"
+        text_color = (255, 100, 100)  # Punainen lataustilanteessa
+    elif boost_is_full:
+        text = "BOOST READY! (Shift)"
+        text_color = (100, 255, 100)  # Vihreä valmiina
+    else:
+        text = f"CHARGING: {boost_energy:.1f}s"
+        text_color = (100, 150, 255)  # Sininen lataus
+    
+    text_surf = font.render(text, True, text_color)
+    screen.blit(text_surf, (bar_x + 5, bar_y - 25))
 
 
 def load_health_bar_images(base_dir):
