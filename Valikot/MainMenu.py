@@ -6,6 +6,7 @@ from Valikot.menu_style import (
     draw_dim_overlay,
     draw_menu_panel,
 )
+from leaderboard import DEFAULT_LEADERBOARD_FILE
 
 
 
@@ -171,7 +172,7 @@ class MainMenu:
     def get_value(self):
         return self.text_input.get_value()
     
-    def show_score(self, x, y, font, screen, filename='leaderboard.json', top_n=5):
+    def show_score(self, x, y, font, screen, filename=DEFAULT_LEADERBOARD_FILE, top_n=5):
         try:
             with open(filename, 'r') as file:
                 scores = json.load(file)
@@ -206,7 +207,7 @@ class MainMenu:
             self.previous_hovered_button = button if button.is_hovered else None
             button.draw(surface)
         
-        self.show_score(50, 50, pygame.font.Font(None, 36), surface, filename='leaderboard.json', top_n=5)
+        self.show_score(50, 50, pygame.font.Font(None, 36), surface, filename=DEFAULT_LEADERBOARD_FILE, top_n=5)
         
         self.text_input.handle_event(pygame.event.poll())
         self.text_input.draw(surface)

@@ -20,7 +20,7 @@ sys.path.append(os.path.dirname(__file__))
 from player2 import Player2
 from Valikot.NextLevel import NextLevel
 from Valikot.gameOver import GameOverScreen
-from leaderboard import Leaderboard
+from leaderboard import Leaderboard, DEFAULT_LEADERBOARD_FILE
 from SpriteSettings import SpriteSettings
 from explosion import ExplosionManager
 from Collision.collisions import SpatialHash, apply_impact, separate, _get_pos, get_collision_radius
@@ -143,7 +143,7 @@ class Game:
         self.pistejarjestelma = None
         self.leaderboard = Leaderboard()
         try:
-            self.leaderboard.load_from_file(os.path.join(os.path.dirname(__file__), 'leaderboard.json'))
+            self.leaderboard.load_from_file(DEFAULT_LEADERBOARD_FILE)
         except FileNotFoundError:
             pass
 
@@ -1256,7 +1256,7 @@ class Game:
                 self.text = ''
             self.leaderboard.add_score(self.text,
                                        self.pistejarjestelma.hae_pisteet())
-            self.leaderboard.save_to_file(os.path.join(self.base_path, 'leaderboard.json'))
+            self.leaderboard.save_to_file(DEFAULT_LEADERBOARD_FILE)
             try:
                 with open('player_name.txt', 'w') as file:
                     # Varmista, että tiedosto on tyhjä ennen seuraavaa peliä.
