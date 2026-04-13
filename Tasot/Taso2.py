@@ -21,6 +21,7 @@ def spawn_wave_taso2(
     up_enemy_cls,
     zigzag_enemy_cls,
     chase_enemy_cls,
+    ultimate_enemy_cls=None,
     enemy_speeds=None,  # Dict with speed overrides
 ):
     """Spawn Level 2 enemies for the requested wave.

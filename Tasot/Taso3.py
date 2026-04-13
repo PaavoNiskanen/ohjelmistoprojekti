@@ -72,6 +72,7 @@ def spawn_wave_taso3(
     up_enemy_cls,
     zigzag_enemy_cls,
     chase_enemy_cls,
+    ultimate_enemy_cls=None,
     enemy_speeds=None,
 ):
     if enemy_speeds is None:
