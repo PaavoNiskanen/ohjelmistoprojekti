@@ -63,9 +63,9 @@ def spawn_wave_taso1(
 		ultimate_enemies = []
 		if ultimate_enemy_cls:
 			positions = [
-				(game.tausta_leveys - 200, game.tausta_korkeus - 200),  # oikea-alas
-				(200, game.tausta_korkeus - 200),  # vasen-alas
-				(game.tausta_leveys // 2, 200),  # keskellä-ylös
+				(game.tausta_leveys - 80, 80),  # oikea-ylös
+				(80, game.tausta_korkeus - 80),  # vasen-alas
+				(game.tausta_leveys - 80, game.tausta_korkeus - 80),  # oikea-alas
 			]
 			for px, py in positions:
 				ue = ultimate_enemy_cls(
@@ -73,6 +73,7 @@ def spawn_wave_taso1(
 					px, py,
 					speed=speeds.get('ultimate', 250),
 					hp=2,
+					sprite_index=20,  # Ship2 configuration
 					exhaust_normal=game.ss.exhaust_normal,
 					exhaust_turbo=game.ss.exhaust_turbo,
 				)
