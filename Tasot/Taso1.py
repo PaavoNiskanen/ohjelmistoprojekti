@@ -63,7 +63,7 @@ def spawn_wave_taso1(
 		e3 = None
 		if ultimate_enemy_cls:
 			e3 = ultimate_enemy_cls(
-				game.enemy_imgs[6],  # 20.png on indeksissä 6 (numero 20 koska 8 PNG:a ennen sitä)
+				game.enemy_imgs[8],  # 20.png on indeksissä 8 (1,2,8,9,10,11,12,13,20)
 				game.tausta_leveys - 200,
 				game.tausta_korkeus - 200,
 				speed=speeds.get('ultimate', 250),
