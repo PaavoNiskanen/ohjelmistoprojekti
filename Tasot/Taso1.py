@@ -24,6 +24,7 @@ def spawn_wave_taso1(
 	up_enemy_cls,
 	zigzag_enemy_cls=None,
     chase_enemy_cls=None,
+	ultimate_enemy_cls=None,
 	enemy_speeds=None,  # Dict with speed overrides: {'straight': 220, 'circle': 180, ...}
 ):
 	"""Spawn Level 1 enemies for the requested wave.
@@ -58,7 +59,29 @@ def spawn_wave_taso1(
 			angular_speed=speeds['circle'],
 			sprite_index=2,
 		)
-		for enemy in (e1, e2):
+		# UltimateEnemy - käyttää Ship2 sprite (20.png)
+		ultimate_enemies = []
+		if ultimate_enemy_cls:
+			positions = [
+				(game.tausta_leveys - 80, 80),  # oikea-ylös
+				(80, game.tausta_korkeus - 80),  # vasen-alas
+				(game.tausta_leveys - 80, game.tausta_korkeus - 80),  # oikea-alas
+			]
+			for px, py in positions:
+				ue = ultimate_enemy_cls(
+					game.enemy_imgs[8],  # 20.png
+					px, py,
+					speed=speeds.get('ultimate', 250),
+					hp=2,
+					sprite_index=20,  # Ship2 configuration
+					exhaust_normal=game.ss.exhaust_normal,
+					exhaust_turbo=game.ss.exhaust_turbo,
+				)
+				_set_enemy_hp(ue, 2)
+				apply_hitbox(ue, hitbox_enemy)
+				ultimate_enemies.append(ue)
+		
+		for enemy in [e1, e2] + ultimate_enemies:
 			_set_enemy_hp(enemy, 1)
 			apply_hitbox(enemy, hitbox_enemy)
 			game.enemies.append(enemy)

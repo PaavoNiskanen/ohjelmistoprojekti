@@ -139,6 +139,7 @@ def spawn_wave_test2(
     up_enemy_cls,
     zigzag_enemy_cls=None,
     chase_enemy_cls=None,
+    ultimate_enemy_cls=None,
     enemy_speeds=None,
 ):
     _ = (circle_enemy_cls, down_enemy_cls, up_enemy_cls, zigzag_enemy_cls, chase_enemy_cls, enemy_speeds)

@@ -25,6 +25,7 @@ def spawn_wave_test(
     up_enemy_cls,
     zigzag_enemy_cls=None,
     chase_enemy_cls=None,
+    ultimate_enemy_cls=None,
     enemy_speeds=None,
 ):
     if wave_num != 1:

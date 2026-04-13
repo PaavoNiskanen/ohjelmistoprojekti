@@ -69,6 +69,13 @@ SPRITE_CONFIG = {
         'max_angle': math.pi,  # 180° = vasemmalle (ei ylösalaisin)
         'description': 'keula oikealle - vain horisontaalinen rotaatio (0-180°)',
     },
+    20: {
+        'rotation_enabled': True,
+        'rotation_offset': math.pi / 2,  # Ship2: Keula oikealle - +90° offset
+        'min_angle': None,
+        'max_angle': None,
+        'description': 'Ship2 alus - keula oikealle - rotaatio käytössä',
+    },
 }
 
 # Default config for unknown sprites
